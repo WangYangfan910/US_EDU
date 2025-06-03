@@ -31,6 +31,10 @@ from datetime import date
 ########################################################
 
 # define data structure to store education and position
+
+
+
+
 @dataclass
 class edu:
     university_raw: str = "none"
@@ -49,9 +53,9 @@ class edu:
 
     # use this function to copy data from the file
     def update_value(self, data):
+        # print(data)
         for field_name in dataclasses.asdict(self).keys():
-            setattr(self, field_name, data.column(field_name)[0])
-
+            setattr(self, field_name, data[field_name])
 
 @dataclass
 class user:
@@ -78,10 +82,11 @@ class user:
     numconnections: np.double = np.double(0)
     profile_summary: str = "none"
 
-    # use this function to copy data from the file
+    # use this function to copy data from one row of the file
     def update_value(self, data):
+        # print(data)
         for field_name in dataclasses.asdict(self).keys():
-            setattr(self, field_name, data.column(field_name)[0])
+            setattr(self, field_name, data[field_name])
 
 @dataclass
 class pos:
@@ -131,8 +136,9 @@ class pos:
 
     # use this function to copy data from the file
     def update_value(self, data):
+        # print(data)
         for field_name in dataclasses.asdict(self).keys():
-            setattr(self, field_name, data.column(field_name)[0])
+            setattr(self, field_name, data[field_name])
 
 @dataclass
 class skill:
@@ -145,11 +151,9 @@ class skill:
 
     # use this function to copy data from the file
     def update_value(self, data):
+        # print(data)
         for field_name in dataclasses.asdict(self).keys():
-            setattr(self, field_name, data.column(field_name)[0])
-
-
-
+            setattr(self, field_name, data[field_name])
 
 
 ########################################################
@@ -157,11 +161,15 @@ class skill:
 ########################################################
 
 # read one user profile file to update df
-def update_prof(ids, file_path, df):
+def update_prof(ids, dir_path, file):
     
+    # construct file path
+    file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
+
     # obtain the min and max target id
-    min_id = ids.column("user_id")[0]
-    max_id = ids.column("user_id")[-1]
+    min_id = ids.column("user_id")[0].as_py()
+    max_id = ids.column("user_id")[-1].as_py()
+    numrows = ids.num_rows
 
     # establish the data input stream
     handle = pq.ParquetFile("{file_path}".format(file_path=file_path))
@@ -170,40 +178,56 @@ def update_prof(ids, file_path, df):
 
     # iterate through the row groups to read data
     for igroup in range(0, num_row_group):
-        group_raw = handle.read_row_group(igroup)
+        print("reading row group: ", igroup)
+
+        dt = {"user_id": ids.column("user_id"), "user_prof": pd.Series([user()] * numrows), "updated": [False] * numrows }
+        df = pd.DataFrame(dt)
+
+        group_data = handle.read_row_group(igroup).to_pandas()
         
         # select only the subset with user id within the target id range
-        id_filter = (pc.field("user_id") >= min_id) & (pc.field("user_id") <= max_id)
-        group_data = group_raw.filter(mask = id_filter, null_selection_behavior = "drop")
-    
-        # retrieve the id list of this row group
-        data_ids = group_data.column("user_id").unique()
+        group_data = group_data[(group_data["user_id"] >= min_id) & (group_data["user_id"] <= max_id)]
+        # data_rows = group_data.shape[0]
+        access_row = 0
+
+        # retrieve the id list of this row group, which is unique for user profile
+        data_ids = pd.unique(group_data["user_id"])
 
         
         for eachid in data_ids:
             # check whether this id is in the target id list
-            if ids.column("user_id").index(eachid) == -1:
-                # return index -1, this id not in ids, continue to next id
+            id_index = ids.column("user_id").index(eachid).as_py()
+            if id_index == -1:
+                # return index -1, this id not in ids, update the access row and continue to next id
+                access_row += 1
                 continue
             else: # this id is in ids, retrieve the relevant info and update df
                 
-                # filter the user with this id
-                expr = pc.field("user_id") == eachid
-                thisuser = group_data.filter(mask = expr, null_selection_behavior = "drop")
-                # each user has only one row, so use this row to construct a user object
-                user_prof = user()
-                user_prof.update_value(thisuser.slice(length=1))
+                # each user has only one row, so use the access row to construct a user object
+                # user_prof = user()
+                # user_prof.update_value(group_data.loc[access_row,:])
                 # update df
-                df.loc[df["user_id"] == eachid, "user_prof"] = user_prof
+                df.loc[id_index, "user_prof"].update_value(group_data.loc[access_row,:])
+                df.loc[id_index, "updated"] = True
+                # update the current access row
+                access_row += 1 
+    
+        df.to_csv(path_or_buf= = "../data_clean/{file}_{igroup}.csv".format(file=file[0:-8], igroup = igroup), index = False)
 
                 
 
 
 # read one user edu file to update df
-def update_edu(ids, file_path, df):
+def update_edu(ids, dir_path, file):
+
+    # construct file path
+    file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
+
     # obtain the min and max target id
-    min_id = ids.column("user_id")[0]
-    max_id = ids.column("user_id")[-1]
+    min_id = ids.column("user_id")[0].as_py()
+    max_id = ids.column("user_id")[-1].as_py()
+    numrows = ids.num_rows
+
 
     # establish the data input stream
     handle = pq.ParquetFile("{file_path}".format(file_path=file_path))
@@ -212,41 +236,66 @@ def update_edu(ids, file_path, df):
 
     # iterate through the row groups to read data
     for igroup in range(0, num_row_group):
-        group_raw = handle.read_row_group(igroup)
+
+        print("reading row group: ", igroup)
+
+        dt = {"user_id": ids.column("user_id"), "edu1": pd.Series([edu()] * numrows), "edu2": pd.Series([edu()] * numrows), "edu3": pd.Series([edu()] * numrows), "edu4": pd.Series([edu()] * numrows), "updated": [False] * numrows}
+        df = pd.DataFrame(dt)
+
+        group_data = handle.read_row_group(igroup).to_pandas()
         
         # select only the subset with user id within the target id range
-        id_filter = (pc.field("user_id") >= min_id) & (pc.field("user_id") <= max_id)
-        group_data = group_raw.filter(mask = id_filter, null_selection_behavior = "drop")
-    
-        # retrieve the id list of this row group
-        data_ids = group_data.column("user_id").unique()
+        group_data = group_data[(group_data["user_id"] >= min_id) & (group_data["user_id"] <= max_id)]
+        data_rows = group_data.shape[0]
 
+        # use access_row to record the current scan row
+        access_row = 0
         
+        # retrieve the id list of this data subset
+        data_ids = pd.unique(group_data["user_id"])
+
+        # assumption: assume each id is associated with at most 20 rows
         for eachid in data_ids:
+
+            # check how many rows this id is associated
+            sub_data = group_data[access_row:min(access_row+20, data_rows)]
+            # use id_rows to record the num of rows associated with one id
+            id_rows = sub_data[sub_data["user_id"] == eachid].shape[0]
+
             # check whether this id is in the target id list
-            if ids.column("user_id").index(eachid) == -1:
-                # return index -1, this id not in ids, continue to next id
+            id_index = ids.column("user_id").index(eachid).as_py()
+            if id_index == -1:
+                # return index -1, this id not in ids, update continue to next id
+                access_row += id_rows
                 continue
             else: # this id is in ids, retrieve the relevant info and update df
                 
-                # filter the user with this id
-                expr = pc.field("user_id") == eachid
-                thisuser = group_data.filter(mask = expr, null_selection_behavior = "drop").sort_by("enddate")
-                
+                # we know the id corresponds to rows: access_row:access_row+id_rows-1
+
                 # a user may have multiple education histories, so iterate through it
                 # we take the most recent 4 education experiences
-                edu_num = thisuser.num_rows
-                for iedu in range(0, min(edu_num, 4)):
-                    user_edu = edu()
-                    user_edu.update_value(thisuser.take([min(edu_num, 4)-1-iedu]))
-                    df.loc[df["user_id"] == eachid, "edu"+str(4-iedu)] = user_edu
+
+                for iedu in range(access_row, min(access_row+id_rows, access_row+4)):
+                    # user_edu = edu()
+                    # user_edu.update_value(group_data.loc[iedu,:])
+                    df.loc[id_index, "edu"+str(4-(iedu-access_row))].update_value(group_data.loc[iedu,:])
+                    df.loc[id_index, "updated"] = True
+                # move access_row forward to next id
+                access_row += id_rows
+        df.to_csv(path_or_buf = "../data_clean/{file}_{igroup}.parquet".format(file=file[0:-8], igroup = igroup), index = False)
+            
+
 
 
 # read one user position file to update df
-def update_pos(ids, file_path, df):
+def update_pos(ids, dir_path, file):
+    # construct file path
+    file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
+
     # obtain the min and max target id
-    min_id = ids.column("user_id")[0]
-    max_id = ids.column("user_id")[-1]
+    min_id = ids.column("user_id")[0].as_py()
+    max_id = ids.column("user_id")[-1].as_py()
+    numrows = ids.num_rows
 
     # establish the data input stream
     handle = pq.ParquetFile("{file_path}".format(file_path=file_path))
@@ -255,41 +304,66 @@ def update_pos(ids, file_path, df):
 
     # iterate through the row groups to read data
     for igroup in range(0, num_row_group):
-        group_raw = handle.read_row_group(igroup)
+        print("reading row group: ", igroup)
+
+        dt = {"user_id": ids.column("user_id"), "pos1": pd.Series([pos()] * numrows), "pos2": pd.Series([pos()] * numrows), "pos3": pd.Series([pos()] * numrows), "pos4": pd.Series([pos()] * numrows), "updated": [False] * numrows }
+        df = pd.DataFrame(dt)
+
+        group_data = handle.read_row_group(igroup).to_pandas()
         
         # select only the subset with user id within the target id range
-        id_filter = (pc.field("user_id") >= min_id) & (pc.field("user_id") <= max_id)
-        group_data = group_raw.filter(mask = id_filter, null_selection_behavior = "drop")
-    
-        # retrieve the id list of this row group
-        data_ids = group_data.column("user_id").unique()
+        group_data = group_data[(group_data["user_id"] >= min_id) & (group_data["user_id"] <= max_id)]
+        data_rows = group_data.shape[0]
 
+        # use access_row to record the current scan row
+        access_row = 0
+        
+        # retrieve the id list of this data subset
+        data_ids = pd.unique(group_data["user_id"])
         
         for eachid in data_ids:
+
+            # check how many rows this id is associated
+            sub_data = group_data[access_row:min(access_row+20, data_rows)]
+            # use id_rows to record the num of rows associated with one id
+            id_rows = sub_data[sub_data["user_id"] == eachid].shape[0]
+
             # check whether this id is in the target id list
-            if ids.column("user_id").index(eachid) == -1:
-                # return index -1, this id not in ids, continue to next id
+            id_index = ids.column("user_id").index(eachid).as_py()
+            if id_index == -1:
+                # return index -1, this id not in ids, update continue to next id
+                access_row += id_rows
                 continue
             else: # this id is in ids, retrieve the relevant info and update df
                 
-                # filter the user with this id
-                expr = pc.field("user_id") == eachid
-                thisuser = group_data.filter(mask = expr, null_selection_behavior = "drop").sort_by("enddate")
-                
-                # a user may have multiple job histories, so iterate through it
-                # we take the earliest 4 work experiences
-                pos_num = thisuser.num_rows
-                for ipos in range(0, min(pos_num, 4)):
-                    user_pos = pos()
-                    user_pos.update_value(thisuser.take([min(pos_num, 4)-1-ipos]))
-                    df.loc[df["user_id"] == eachid, "pos"+str(4-ipos)] = user_pos
+                # we know the id corresponds to rows: access_row:access_row+id_rows-1
+
+                # a user may have multiple education histories, so iterate through it
+                # we take the most recent 4 education experiences
+
+                for ipos in range(access_row, min(access_row+id_rows, access_row+4)):
+                    # user_edu = edu()
+                    # user_edu.update_value(group_data.loc[iedu,:])
+                    df.loc[id_index, "pos"+str(4-(ipos-access_row))].update_value(group_data.loc[ipos,:])
+                    df.loc[id_index, "updated"] = True
+                # move access_row forward to next id
+                access_row += id_rows
+
+        df.to_csv(path_or_buf = "../data_clean/{file}_{igroup}.parquet".format(file=file[0:-8], igroup = igroup), index = False)
+
+
 
 
 # read one user skill file to update df
-def update_skill(ids, file_path, df):
-     # obtain the min and max target id
-    min_id = ids.column("user_id")[0]
-    max_id = ids.column("user_id")[-1]
+def update_skill(ids, dir_path, file):
+
+    # construct file path
+    file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
+
+    # obtain the min and max target id
+    min_id = ids.column("user_id")[0].as_py()
+    max_id = ids.column("user_id")[-1].as_py()
+    numrows = ids.num_rows
 
     # establish the data input stream
     handle = pq.ParquetFile("{file_path}".format(file_path=file_path))
@@ -298,31 +372,41 @@ def update_skill(ids, file_path, df):
 
     # iterate through the row groups to read data
     for igroup in range(0, num_row_group):
-        group_raw = handle.read_row_group(igroup)
+        print("reading row group: ", igroup)
+
+        dt = {"user_id": ids.column("user_id"), "skill": pd.Series([skill()] * numrows), "updated": [False] * numrows }
+        df = pd.DataFrame(dt)
+
+        group_data = handle.read_row_group(igroup).to_pandas()
         
         # select only the subset with user id within the target id range
-        id_filter = (pc.field("user_id") >= min_id) & (pc.field("user_id") <= max_id)
-        group_data = group_raw.filter(mask = id_filter, null_selection_behavior = "drop")
-    
-        # retrieve the id list of this row group
-        data_ids = group_data.column("user_id").unique()
+        group_data = group_data[(group_data["user_id"] >= min_id) & (group_data["user_id"] <= max_id)]
+        # data_rows = group_data.shape[0]
+        access_row = 0
+
+        # retrieve the id list of this row group, which is unique for user profile
+        data_ids = pd.unique(group_data["user_id"])
 
         
         for eachid in data_ids:
             # check whether this id is in the target id list
-            if ids.column("user_id").index(eachid) == -1:
-                # return index -1, this id not in ids, continue to next id
+            id_index = ids.column("user_id").index(eachid).as_py()
+            if id_index == -1:
+                # return index -1, this id not in ids, update the access row and continue to next id
+                access_row += 1
                 continue
             else: # this id is in ids, retrieve the relevant info and update df
                 
-                # filter the user with this id
-                expr = pc.field("user_id") == eachid
-                thisuser = group_data.filter(mask = expr, null_selection_behavior = "drop")
-                # each user has only one row, so use this row to construct a skill object
-                user_skill = skill()
-                user_skill.update_value(thisuser.slice(length=1))
+                # each user has only one row, so use the access row to construct a user object
+                # user_prof = user()
+                # user_prof.update_value(group_data.loc[access_row,:])
                 # update df
-                df.loc[df["user_id"] == eachid, "skill"] = user_skill
+                df.loc[id_index, "skill"].update_value(group_data.loc[access_row,:])
+                df.loc[id_index, "updated"] = True
+                # update the current access row
+                access_row += 1
+
+        df.to_csv(path_or_buf = "../data_clean/{file}_{igroup}.parquet".format(file=file[0:-8], igroup = igroup), index = False)
 
 
 
@@ -330,14 +414,15 @@ def update_skill(ids, file_path, df):
 # ids is the target user id list, already sorted in ascending order
 def read_one_file(file_path, ids, df):
 
-    if "education" in file_path:
-        update_edu(ids, file_path, df)
-    elif "user_part" in file_path:
-        update_prof(ids, file_path, df)
-    elif "user_position" in file_path:
-        update_pos(ids, file_path, df)
-    elif "user_skill" in file_path:
-        update_skill(ids, file_path, df)
+    # if "education" in file_path:
+    #     update_edu(ids, file_path, df)
+    # elif "user_part" in file_path:
+    #     update_prof(ids, file_path, df)
+    # elif "user_position" in file_path:
+    #     update_pos(ids, file_path, df)
+    # elif "user_skill" in file_path:
+    #     update_skill(ids, file_path, df)
+    return
 
 
 
@@ -345,18 +430,19 @@ def read_one_file(file_path, ids, df):
 
 
 # It's assumed that a folder "US_EDUC" exists in dir_path and contains all the user data
+# construct the full sample
 def construct_user_data(dir_path):
 
     # read the target id data
     ids = pq.read_table("{dir_path}/unique_user_id_US_EDUC.parquet".format(dir_path=dir_path))
     # sort user id: later would useful in filtering
-    ids.sort_by("user_id")
+    ids = ids.sort_by("user_id")
 
     print("user id list read")
 
     # create an empty DataFrame according to user_id
     numrows = ids.num_rows
-    dt = {"user_id": ids.column("user_id"), "user_prof":pd.Series([pd.NA] * numrows), "skill":pd.Series([pd.NA] * numrows), "edu1":pd.Series([pd.NA] * numrows), "edu2":pd.Series([pd.NA] * numrows), "edu3": pd.Series([pd.NA] * numrows), "edu4": pd.Series([pd.NA] * numrows), "pos1": pd.Series([pd.NA] * numrows), "pos2": pd.Series([pd.NA] * numrows), "pos3":pd.Series([pd.NA] * numrows), "pos4":pd.Series([pd.NA] * numrows) }
+    dt = {"user_id": ids.column("user_id"), "user_prof": pd.Series([user()] * numrows), "skill": pd.Series([skill()] * numrows), "edu1": pd.Series([edu()] * numrows), "edu2": pd.Series([edu()] * numrows), "edu3": pd.Series([edu()] * numrows), "edu4": pd.Series([edu()] * numrows), "pos1": pd.Series([pos()] * numrows), "pos2": pd.Series([pos()] * numrows), "pos3": pd.Series([pos()] * numrows), "pos4": pd.Series([pos()] * numrows) }
     df = pd.DataFrame(dt)
     # set the datatype of each column
     # df.astype({"user_id":np.int64, "user_prof":user, "skill":skill, "edu1":edu, "edu2":edu, "edu3":edu, "edu4":edu, "pos1": pos, "pos2": pos, "pos3":pos, "pos4":pos })
@@ -372,7 +458,56 @@ def construct_user_data(dir_path):
         print("finish reading {file}".format(file=file))
     return df
 
+# reads each file separately and write to data
+def read_data_separate(dir_path, file_list):
+    
+    # read the target id data
+    ids = pq.read_table("{dir_path}/unique_user_id_US_EDUC.parquet".format(dir_path=dir_path))
+    # sort user id: later would useful in filtering
+    ids = ids.sort_by("user_id")
+    # numrows = ids.num_rows
+
+    print("user id list read")
+
+    # # obtain file list
+    # file_list = os.listdir("{dir_path}/US_EDUC".format(dir_path=dir_path))
+
+    for file in file_list:
+
+        print("start reading {file}".format(file=file))
+
+        if "education" in file:
+            # file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
+            # dt = {"user_id": ids.column("user_id"), "edu1": pd.Series([edu()] * numrows), "edu2": pd.Series([edu()] * numrows), "edu3": pd.Series([edu()] * numrows), "edu4": pd.Series([edu()] * numrows), "updated": [False] * numrows}
+            # df = pd.DataFrame(dt)
+            update_edu(ids, dir_path, file)
+            # df.to_parquet(path = "../data_clean/{file}.parquet".format(file=file))
+        
+        elif "user_part" in file:
+            # file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
+            # dt = {"user_id": ids.column("user_id"), "user_prof": pd.Series([user()] * numrows), "updated": [False] * numrows }
+            # df = pd.DataFrame(dt)
+            update_prof(ids, dir_path, file)
+            # df.to_parquet(path = "../data_clean/{file}.parquet".format(file=file))
+
+        elif "user_position" in file:
+            
+            # file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
+            # dt = {"user_id": ids.column("user_id"), "pos1": pd.Series([pos()] * numrows), "pos2": pd.Series([pos()] * numrows), "pos3": pd.Series([pos()] * numrows), "pos4": pd.Series([pos()] * numrows), "updated": [False] * numrows }
+            # df = pd.DataFrame(dt)
+            update_pos(ids, dir_path, file)
+            # df.to_parquet(path = "../data_clean/{file}.parquet".format(file=file))
+
+        elif "user_skill" in file:
+
+            # file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
+            # dt = {"user_id": ids.column("user_id"), "skill": pd.Series([skill()] * numrows), "updated": [False] * numrows }
+            # df = pd.DataFrame(dt)
+            update_skill(ids, dir_path, file)
+            # df.to_parquet(path = "../data_clean/{file}.parquet".format(file=file))
+
+        print("finish reading {file}".format(file=file))
 
 
-
+        
 
