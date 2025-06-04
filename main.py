@@ -7,6 +7,7 @@ import multiprocessing
 
 # set constants and data path
 DATA_PATH = "../data"
+WRITE_PATH = "../data_clean"
 
 # obtain file list
 file_list = os.listdir("{dir_path}/US_EDUC".format(dir_path=DATA_PATH))
@@ -20,18 +21,21 @@ skill_list = [file for file in file_list if "user_skill" in file]
 
 if __name__ == "__main__":
     # creating processes
-    p1 = multiprocessing.Process(target=rd.read_data_separate, args=(DATA_PATH, prof_list))
-    p2 = multiprocessing.Process(target=rd.read_data_separate, args=(DATA_PATH, skill_list))
-    p3 = multiprocessing.Process(target=rd.read_data_separate, args=(DATA_PATH, edu_list))
+    # p1 = multiprocessing.Process(target=rd.read_data_separate, args=(DATA_PATH, prof_list))
+    # p2 = multiprocessing.Process(target=rd.read_data_separate, args=(DATA_PATH, skill_list))
+    p3 = multiprocessing.Process(target=rd.read_data_separate, args=(DATA_PATH, WRITE_PATH, edu_list))
+    p4 = multiprocessing.Process(target=rd.read_data_separate, args=(DATA_PATH, WRITE_PATH, pos_list))
     # starting processes
-    p1.start()
-    p2.start()
+    # p1.start()
+    # p2.start()
     p3.start()
+    p4.start()
 
     # wait until processes are finished
-    p1.join()
-    p2.join()
+    # p1.join()
+    # p2.join()
     p3.join()
+    p4.join()
 
 
 

@@ -7,7 +7,7 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
-import dataclasses
+# import dataclasses
 from dataclasses import dataclass
 import itertools
 from datetime import date
@@ -30,130 +30,205 @@ from datetime import date
 #################### DATA STRUCTURE ####################
 ########################################################
 
-# define data structure to store education and position
+# define the tuple of varaibles for each file type
+
+edu_var = ("user_id",
+    "university_raw", 
+    "university_name", 
+    "education_number", 
+    "startdate", 
+    "enddate", 
+    "degree", 
+    "field", 
+    "degree_raw", 
+    "field_raw", 
+    "world_rank", 
+    "us_rank",
+    "university_country",
+    "university_location",
+    "updated")
+
+edu_default = ( 0, # "user_id",
+                "none", # "university_raw", 
+                "none", # "university_name", 
+                0, # "education_number", 
+                date(2077,9,10), # "startdate", 
+                date(2077,9,10), # "enddate", 
+                "none", # "degree", 
+                "none", # "field", 
+                "none", # "degree_raw", 
+                "none", # "field_raw", 
+                0, # "world_rank", 
+                0, # "us_rank",
+                "none", # "university_country",
+                "none", # "university_location",
+                False)# "updated" 
+
+
+user_var= ("user_id",
+    "firstname",
+    "lastname",
+    "fullname",
+    "f_prob", 
+    "m_prob", 
+    "white_prob", 
+    "black_prob", 
+    "api_prob", 
+    "hispanic_prob", 
+    "native_prob", 
+    "multiple_prob", 
+    "prestige", 
+    "highest_degree", 
+    "sex_predicted", 
+    "ethnicity_predicted", 
+    "profile_linkedin_url", 
+    "user_location", 
+    "user_country", 
+    "profile_title", 
+    "updated_dt", 
+    "numconnections", 
+    "profile_summary",
+    "updated" )
+
+
+user_default= (0, # "user_id",
+               "none", # "firstname",
+                "none", # "lastname",
+                "none", # "fullname",
+                0.0, # "f_prob", 
+                0.0, # "m_prob", 
+                0.0, # "white_prob", 
+                0.0, # "black_prob", 
+                0.0, # "api_prob", 
+                0.0, # "hispanic_prob", 
+                0.0, # "native_prob", 
+                0.0, # "multiple_prob", 
+                0.0, # "prestige", 
+                "none", # "highest_degree", 
+                "none", # "sex_predicted", 
+                "none", # "ethnicity_predicted", 
+                "none", # "profile_linkedin_url", 
+                "none", # "user_location", 
+                "none", # "user_country", 
+                "none", # "profile_title", 
+                "none", # "updated_dt", 
+                0, # "numconnections", 
+                "none", # "profile_summary",
+                False)# "updated" )
 
 
 
+pos_var = ("user_id",
+    "position_id",
+    "company_raw",
+    "company_linkedin_url",
+    "company_cleaned",
+    "location_raw",
+    "region",
+    "country",
+    "state",
+    "metro_area",
+    "startdate",
+    "enddate",
+    "title_raw",
+    "role_k1500",
+    "job_category",
+    "role_k50",
+    "role_k150",
+    "role_k300",
+    "role_k500",
+    "role_k1000",
+    "remote_suitability",
+    "weight",
+    "description",
+    "start_salary",
+    "end_salary",
+    "seniority",
+    "salary",
+    "position_number",
+    "rcid",
+    "company_name",
+    "ultimate_parent_rcid",
+    "ultimate_parent_company_name",
+    "onet_code",
+    "onet_title",
+    "ticker",
+    "exchange",
+    "cusip",
+    "naics_code",
+    "naics_description",
+    "ultimate_parent_factset_id",
+    "ultimate_parent_factset_name",
+    "total_compensation",
+    "additional_compensation",
+    "title_translated",
+    "updated")
 
-@dataclass
-class edu:
-    university_raw: str = "none"
-    university_name: str = "none"
-    education_number: np.int32 = np.int32(0)
-    startdate: pa.date32 = date(2077, 9, 10)
-    enddate: pa.date32 = date(2077, 9, 10)
-    degree: str = "none"
-    field: str = "none"
-    degree_raw: str = "none"
-    field_raw: str = "none"
-    world_rank: np.double = np.double(0)
-    us_rank: np.double = np.double(0)
-    university_country: str = "none"
-    university_location: str = "none"
+pos_default = ( 0, # "user_id",
+                0, # "position_id",
+                "none", # "company_raw",
+                "none", # "company_linkedin_url",
+                "none", # "company_cleaned",
+                "none", # "location_raw",
+                "none", # "region",
+                "none", # "country",
+                "none", # "state",
+                "none", # "metro_area",
+                date(2077,9,10), # "startdate",
+                date(2077,9,10), # "enddate",
+                "none", # "title_raw",
+                "none", # "role_k1500",
+                "none", # "job_category",
+                "none", # "role_k50",
+                "none", # "role_k150",
+                "none", # "role_k300",
+                "none", # "role_k500",
+                "none", # "role_k1000",
+                0, # "remote_suitability",
+                0, # "weight",
+                "none", # "description",
+                0.0, # "start_salary",
+                0.0, # "end_salary",
+                0, # "seniority",
+                0.0, # "salary",
+                0, # "position_number",
+                0, # "rcid",
+                "none", # "company_name",
+                0, # "ultimate_parent_rcid",
+                "none", # "ultimate_parent_company_name",
+                "none", # "onet_code",
+                "none", # "onet_title",
+                "none", # "ticker",
+                "none", # "exchange",
+                "none", # "cusip",
+                "none", # "naics_code",
+                "none", # "naics_description",
+                "none", # "ultimate_parent_factset_id",
+                "none", # "ultimate_parent_factset_name",
+                0.0, # "total_compensation",
+                0.0, # "additional_compensation",
+                "none", # "title_translated",
+                False)# "updated")
+            
 
-    # use this function to copy data from the file
-    def update_value(self, data):
-        # print(data)
-        for field_name in dataclasses.asdict(self).keys():
-            setattr(self, field_name, data[field_name])
+skill_var = ("user_id",
+    "skill_raw",
+    "skill_source",
+    "skill_mapped",
+    "skill_k25",
+    "skill_k50",
+    "skill_k75",
+    "updated")
 
-@dataclass
-class user:
-    firstname: str = "none"
-    lastname: str = "none"
-    fullname: str = "none"
-    f_prob: np.double = np.double(0)
-    m_prob: np.double = np.double(0)
-    white_prob: np.double = np.double(0)
-    black_prob: np.double = np.double(0)
-    api_prob: np.double = np.double(0)
-    hispanic_prob: np.double = np.double(0)
-    native_prob: np.double = np.double(0)
-    multiple_prob: np.double = np.double(0)
-    prestige: np.double = np.double(0)
-    highest_degree: str = "none"
-    sex_predicted: str = "none"
-    ethnicity_predicted: str = "none"
-    profile_linkedin_url: str = "none"
-    user_location: str = "none"
-    user_country: str = "none"
-    profile_title: str = "none"
-    updated_dt: pa.date32 = date(2077, 9, 10)
-    numconnections: np.double = np.double(0)
-    profile_summary: str = "none"
+skill_default = ( 0, # "user_id",
+                "none", # "skill_raw",
+                "none", # "skill_source",
+                "none", # "skill_mapped",
+                "none", # "skill_k25",
+                "none", # "skill_k50",
+                "none", # "skill_k75",
+                False)# "updated")
 
-    # use this function to copy data from one row of the file
-    def update_value(self, data):
-        # print(data)
-        for field_name in dataclasses.asdict(self).keys():
-            setattr(self, field_name, data[field_name])
-
-@dataclass
-class pos:
-    position_id: np.int64 = np.int64(0)
-    company_raw: str = "none"
-    company_linkedin_url: str = "none"
-    company_cleaned: str = "none"
-    location_raw: str = "none"
-    region: str = "none"
-    country: str = "none"
-    state: str = "none"
-    metro_area: str = "none"
-    startdate: str = "none"
-    enddate: str = "none"
-    title_raw: str = "none"
-    role_k1500: str = "none"
-    job_category: str = "none"
-    role_k50: str = "none"
-    role_k150: str = "none"
-    role_k300: str = "none"
-    role_k500: str = "none"
-    role_k1000: str = "none"
-    remote_suitability: float = 0.0
-    weight: float = 0.0
-    description: str = "none"
-    start_salary: np.double = np.double(0)
-    end_salary: np.double = np.double(0)
-    seniority: np.int16 = np.int16(0)
-    salary: float = 0.0
-    position_number: np.int16 = np.int16(0)
-    rcid: np.double = np.double(0)
-    company_name: str = "none"
-    ultimate_parent_rcid: np.double = np.double(0)
-    ultimate_parent_company_name: str = "none"
-    onet_code: str = "none"
-    onet_title: str = "none"
-    ticker: str = "none"
-    exchange: str = "none"
-    cusip: str = "none"
-    naics_code: str = "none"
-    naics_description: str = "none"
-    ultimate_parent_factset_id: str = "none"
-    ultimate_parent_factset_name: str = "none"
-    total_compensation: float = 0.0
-    additional_compensation: float = 0.0
-    title_translated: str = "none"
-
-    # use this function to copy data from the file
-    def update_value(self, data):
-        # print(data)
-        for field_name in dataclasses.asdict(self).keys():
-            setattr(self, field_name, data[field_name])
-
-@dataclass
-class skill:
-    skill_raw: str = "none"
-    skill_source: str = "none"
-    skill_mapped: str = "none"
-    skill_k25: str = "none"
-    skill_k50: str = "none"
-    skill_k75: str = "none"
-
-    # use this function to copy data from the file
-    def update_value(self, data):
-        # print(data)
-        for field_name in dataclasses.asdict(self).keys():
-            setattr(self, field_name, data[field_name])
 
 
 ########################################################
@@ -161,7 +236,7 @@ class skill:
 ########################################################
 
 # read one user profile file to update df
-def update_prof(ids, dir_path, file):
+def update_prof(ids, dir_path, write_path, file):
     
     # construct file path
     file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
@@ -180,7 +255,9 @@ def update_prof(ids, dir_path, file):
     for igroup in range(0, num_row_group):
         print("reading row group: ", igroup)
 
-        dt = {"user_id": ids.column("user_id"), "user_prof": pd.Series([user()] * numrows), "updated": [False] * numrows }
+        # create dataframes for storing data, 
+        dt = {field_name: [field_default] * numrows for (field_name, field_default) in itertools.zip_longest(user_var, user_default)}
+        dt["user_id"] = ids.column("user_id")
         df = pd.DataFrame(dt)
 
         group_data = handle.read_row_group(igroup).to_pandas()
@@ -204,21 +281,23 @@ def update_prof(ids, dir_path, file):
             else: # this id is in ids, retrieve the relevant info and update df
                 
                 # each user has only one row, so use the access row to construct a user object
-                # user_prof = user()
-                # user_prof.update_value(group_data.loc[access_row,:])
                 # update df
-                df.loc[id_index, "user_prof"].update_value(group_data.loc[access_row,:])
+
+                df.iloc[id_index, 0:-1] = group_data.iloc[access_row, :]
                 df.loc[id_index, "updated"] = True
+
                 # update the current access row
                 access_row += 1 
-    
-        df.to_csv(path_or_buf= = "../data_clean/{file}_{igroup}.csv".format(file=file[0:-8], igroup = igroup), index = False)
+
+
+        df.to_parquet(path_or_buf = "{write_path}/{file}_{igroup}.parquet".format(write_path = write_path, file=file[0:-8], igroup = igroup), index = False)
 
                 
 
 
 # read one user edu file to update df
-def update_edu(ids, dir_path, file):
+# we just people with at most 6 education entries
+def update_edu(ids, dir_path, write_path, file):
 
     # construct file path
     file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
@@ -239,26 +318,41 @@ def update_edu(ids, dir_path, file):
 
         print("reading row group: ", igroup)
 
-        dt = {"user_id": ids.column("user_id"), "edu1": pd.Series([edu()] * numrows), "edu2": pd.Series([edu()] * numrows), "edu3": pd.Series([edu()] * numrows), "edu4": pd.Series([edu()] * numrows), "updated": [False] * numrows}
-        df = pd.DataFrame(dt)
+        dt = {field_name: [field_default] * numrows for (field_name, field_default) in itertools.zip_longest(edu_var, edu_default)}
+        dt["user_id"] = ids.column("user_id")
+        df1 = pd.DataFrame(dt)
+        df2 = pd.DataFrame(dt)
+        df3 = pd.DataFrame(dt)
+        df4 = pd.DataFrame(dt)
+        df5 = pd.DataFrame(dt)
+        df6 = pd.DataFrame(dt)
+        dfs = (df1, df2, df3, df4, df5, df6)
 
         group_data = handle.read_row_group(igroup).to_pandas()
         
         # select only the subset with user id within the target id range
         group_data = group_data[(group_data["user_id"] >= min_id) & (group_data["user_id"] <= max_id)]
-        data_rows = group_data.shape[0]
 
+        # select only the subset with at most 6 edu entries
+        remove_id = pd.unique(group_data[group_data["education_number"] > 6]["user_id"])
+        group_data = group_data[~group_data["user_id"].isin(remove_id)]
+
+        # sort by id and enddate
+        group_data.sort_values(["user_id", "enddate"], inplace = True)
+        
+        data_rows = group_data.shape[0]
+        
         # use access_row to record the current scan row
         access_row = 0
         
         # retrieve the id list of this data subset
         data_ids = pd.unique(group_data["user_id"])
 
-        # assumption: assume each id is associated with at most 20 rows
+        # assumption: assume each id is associated with at most 10 rows
         for eachid in data_ids:
 
             # check how many rows this id is associated
-            sub_data = group_data[access_row:min(access_row+20, data_rows)]
+            sub_data = group_data[access_row:min(access_row+10, data_rows)]
             # use id_rows to record the num of rows associated with one id
             id_rows = sub_data[sub_data["user_id"] == eachid].shape[0]
 
@@ -276,19 +370,21 @@ def update_edu(ids, dir_path, file):
                 # we take the most recent 4 education experiences
 
                 for iedu in range(access_row, min(access_row+id_rows, access_row+4)):
-                    # user_edu = edu()
-                    # user_edu.update_value(group_data.loc[iedu,:])
-                    df.loc[id_index, "edu"+str(4-(iedu-access_row))].update_value(group_data.loc[iedu,:])
-                    df.loc[id_index, "updated"] = True
+                    
+                    dfs[iedu-access_row].iloc[id_index, 0:-1] = group_data.iloc[iedu, :]
+                    dfs[iedu-access_row].loc[id_index, "updated"] = True
                 # move access_row forward to next id
                 access_row += id_rows
-        df.to_csv(path_or_buf = "../data_clean/{file}_{igroup}.parquet".format(file=file[0:-8], igroup = igroup), index = False)
+        
+        for edu_num in range(0,6):
+            dfs[edu_num].to_parquet(path_or_buf = "{write_path}/{file}_{igroup}_edu{edu_num}.parquet".format(write_path = write_path, file = file[0:-8], igroup = igroup, edu_num = edu_num), index = False)
             
 
 
 
 # read one user position file to update df
-def update_pos(ids, dir_path, file):
+# take only the first 5 positions
+def update_pos(ids, dir_path, write_path, file):
     # construct file path
     file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
 
@@ -306,13 +402,23 @@ def update_pos(ids, dir_path, file):
     for igroup in range(0, num_row_group):
         print("reading row group: ", igroup)
 
-        dt = {"user_id": ids.column("user_id"), "pos1": pd.Series([pos()] * numrows), "pos2": pd.Series([pos()] * numrows), "pos3": pd.Series([pos()] * numrows), "pos4": pd.Series([pos()] * numrows), "updated": [False] * numrows }
-        df = pd.DataFrame(dt)
+        dt = {field_name: [field_default] * numrows for (field_name, field_default) in itertools.zip_longest(pos_var, pos_default)}
+        dt["user_id"] = ids.column("user_id")
+        df1 = pd.DataFrame(dt)
+        df2 = pd.DataFrame(dt)
+        df3 = pd.DataFrame(dt)
+        df4 = pd.DataFrame(dt)
+        df5 = pd.DataFrame(dt)
+        dfs = (df1, df2, df3, df4, df5)
 
         group_data = handle.read_row_group(igroup).to_pandas()
         
         # select only the subset with user id within the target id range
         group_data = group_data[(group_data["user_id"] >= min_id) & (group_data["user_id"] <= max_id)]
+        
+        # sort by id and enddate
+        group_data.sort_values(["user_id", "enddate"], inplace = True)
+
         data_rows = group_data.shape[0]
 
         # use access_row to record the current scan row
@@ -324,7 +430,7 @@ def update_pos(ids, dir_path, file):
         for eachid in data_ids:
 
             # check how many rows this id is associated
-            sub_data = group_data[access_row:min(access_row+20, data_rows)]
+            sub_data = group_data.iloc[access_row:,0]
             # use id_rows to record the num of rows associated with one id
             id_rows = sub_data[sub_data["user_id"] == eachid].shape[0]
 
@@ -341,21 +447,20 @@ def update_pos(ids, dir_path, file):
                 # a user may have multiple education histories, so iterate through it
                 # we take the most recent 4 education experiences
 
-                for ipos in range(access_row, min(access_row+id_rows, access_row+4)):
-                    # user_edu = edu()
-                    # user_edu.update_value(group_data.loc[iedu,:])
-                    df.loc[id_index, "pos"+str(4-(ipos-access_row))].update_value(group_data.loc[ipos,:])
-                    df.loc[id_index, "updated"] = True
+                for ipos in range(access_row, min(access_row+id_rows, access_row+5)):
+                    dfs[ipos-access_row].iloc[id_index, 0:-1] = group_data.iloc[ipos, :]
+                    dfs[ipos-access_row].loc[id_index, "updated"] = True
                 # move access_row forward to next id
                 access_row += id_rows
 
-        df.to_csv(path_or_buf = "../data_clean/{file}_{igroup}.parquet".format(file=file[0:-8], igroup = igroup), index = False)
+        for pos_num in range(0,5):
+            dfs[pos_num].to_parquet(path_or_buf = "{write_path}/{file}_{igroup}_pos{pos_num}.parquet".format(write_path = write_path, file = file[0:-8], igroup = igroup, pos_num = pos_num), index = False)
 
 
 
 
 # read one user skill file to update df
-def update_skill(ids, dir_path, file):
+def update_skill(ids, dir_path, write_path, file):
 
     # construct file path
     file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
@@ -374,7 +479,9 @@ def update_skill(ids, dir_path, file):
     for igroup in range(0, num_row_group):
         print("reading row group: ", igroup)
 
-        dt = {"user_id": ids.column("user_id"), "skill": pd.Series([skill()] * numrows), "updated": [False] * numrows }
+        # create dataframes for storing data,
+        dt = {field_name: [field_default] * numrows for (field_name, field_default) in itertools.zip_longest(skill_var, skill_default)}
+        dt["user_id"] = ids.column("user_id")
         df = pd.DataFrame(dt)
 
         group_data = handle.read_row_group(igroup).to_pandas()
@@ -398,15 +505,13 @@ def update_skill(ids, dir_path, file):
             else: # this id is in ids, retrieve the relevant info and update df
                 
                 # each user has only one row, so use the access row to construct a user object
-                # user_prof = user()
-                # user_prof.update_value(group_data.loc[access_row,:])
                 # update df
-                df.loc[id_index, "skill"].update_value(group_data.loc[access_row,:])
+                df.iloc[id_index, 0:-1] = group_data.iloc[access_row, :]
                 df.loc[id_index, "updated"] = True
                 # update the current access row
                 access_row += 1
 
-        df.to_csv(path_or_buf = "../data_clean/{file}_{igroup}.parquet".format(file=file[0:-8], igroup = igroup), index = False)
+        df.to_parquet(path_or_buf = "{write_path}/{file}_{igroup}.parquet".format(write_path = write_path, file=file[0:-8], igroup = igroup), index = False)
 
 
 
@@ -459,7 +564,7 @@ def construct_user_data(dir_path):
     return df
 
 # reads each file separately and write to data
-def read_data_separate(dir_path, file_list):
+def read_data_separate(dir_path, write_path, file_list):
     
     # read the target id data
     ids = pq.read_table("{dir_path}/unique_user_id_US_EDUC.parquet".format(dir_path=dir_path))
@@ -480,14 +585,14 @@ def read_data_separate(dir_path, file_list):
             # file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
             # dt = {"user_id": ids.column("user_id"), "edu1": pd.Series([edu()] * numrows), "edu2": pd.Series([edu()] * numrows), "edu3": pd.Series([edu()] * numrows), "edu4": pd.Series([edu()] * numrows), "updated": [False] * numrows}
             # df = pd.DataFrame(dt)
-            update_edu(ids, dir_path, file)
+            update_edu(ids, dir_path, write_path, file)
             # df.to_parquet(path = "../data_clean/{file}.parquet".format(file=file))
         
         elif "user_part" in file:
             # file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
             # dt = {"user_id": ids.column("user_id"), "user_prof": pd.Series([user()] * numrows), "updated": [False] * numrows }
             # df = pd.DataFrame(dt)
-            update_prof(ids, dir_path, file)
+            update_prof(ids, dir_path, write_path, file)
             # df.to_parquet(path = "../data_clean/{file}.parquet".format(file=file))
 
         elif "user_position" in file:
@@ -495,7 +600,7 @@ def read_data_separate(dir_path, file_list):
             # file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
             # dt = {"user_id": ids.column("user_id"), "pos1": pd.Series([pos()] * numrows), "pos2": pd.Series([pos()] * numrows), "pos3": pd.Series([pos()] * numrows), "pos4": pd.Series([pos()] * numrows), "updated": [False] * numrows }
             # df = pd.DataFrame(dt)
-            update_pos(ids, dir_path, file)
+            update_pos(ids, dir_path, write_path, file)
             # df.to_parquet(path = "../data_clean/{file}.parquet".format(file=file))
 
         elif "user_skill" in file:
@@ -503,7 +608,7 @@ def read_data_separate(dir_path, file_list):
             # file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
             # dt = {"user_id": ids.column("user_id"), "skill": pd.Series([skill()] * numrows), "updated": [False] * numrows }
             # df = pd.DataFrame(dt)
-            update_skill(ids, dir_path, file)
+            update_skill(ids, dir_path, write_path, file)
             # df.to_parquet(path = "../data_clean/{file}.parquet".format(file=file))
 
         print("finish reading {file}".format(file=file))
