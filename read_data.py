@@ -527,10 +527,6 @@ def read_one_file(ids, dir_path, write_path, file):
     return
 
 
-
-   
-
-
 # It's assumed that a folder "US_EDUC" exists in dir_path and contains all the user data
 # construct the full sample
 # def construct_user_data(dir_path):
