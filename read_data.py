@@ -7,8 +7,6 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
-# import dataclasses
-from dataclasses import dataclass
 import itertools
 from datetime import date
 
@@ -236,7 +234,7 @@ skill_default = ( 0, # "user_id",
 ########################################################
 
 # read one user profile file to update df
-def update_prof(ids, dir_path, write_path, file):
+def read_prof(ids, dir_path, write_path, file):
     
     # construct file path
     file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
@@ -296,8 +294,8 @@ def update_prof(ids, dir_path, write_path, file):
 
 
 # read one user edu file to update df
-# we just people with at most 6 education entries
-def update_edu(ids, dir_path, write_path, file):
+# we just people with at most 4 education entries
+def read_edu(ids, dir_path, write_path, file):
 
     # construct file path
     file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
@@ -325,8 +323,8 @@ def update_edu(ids, dir_path, write_path, file):
         df3 = pd.DataFrame(dt)
         df4 = pd.DataFrame(dt)
         df5 = pd.DataFrame(dt)
-        df6 = pd.DataFrame(dt)
-        dfs = (df1, df2, df3, df4, df5, df6)
+        dfs = (df1, df2, df3, df4, df5)
+        print("dfs created")
 
         group_data = handle.read_row_group(igroup).to_pandas()
         
@@ -369,14 +367,14 @@ def update_edu(ids, dir_path, write_path, file):
                 # a user may have multiple education histories, so iterate through it
                 # we take the most recent 4 education experiences
 
-                for iedu in range(access_row, min(access_row+id_rows, access_row+4)):
+                for iedu in range(access_row, min(access_row+id_rows, access_row+5)):
                     
                     dfs[iedu-access_row].iloc[id_index, 0:-1] = group_data.iloc[iedu, :]
                     dfs[iedu-access_row].loc[id_index, "updated"] = True
                 # move access_row forward to next id
                 access_row += id_rows
         
-        for edu_num in range(0,6):
+        for edu_num in range(0,5):
             dfs[edu_num].to_parquet(path_or_buf = "{write_path}/{file}_{igroup}_edu{edu_num}.parquet".format(write_path = write_path, file = file[0:-8], igroup = igroup, edu_num = edu_num), index = False)
             
 
@@ -384,7 +382,7 @@ def update_edu(ids, dir_path, write_path, file):
 
 # read one user position file to update df
 # take only the first 5 positions
-def update_pos(ids, dir_path, write_path, file):
+def read_pos(ids, dir_path, write_path, file):
     # construct file path
     file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
 
@@ -408,8 +406,7 @@ def update_pos(ids, dir_path, write_path, file):
         df2 = pd.DataFrame(dt)
         df3 = pd.DataFrame(dt)
         df4 = pd.DataFrame(dt)
-        df5 = pd.DataFrame(dt)
-        dfs = (df1, df2, df3, df4, df5)
+        dfs = (df1, df2, df3, df4)
 
         group_data = handle.read_row_group(igroup).to_pandas()
         
@@ -444,23 +441,23 @@ def update_pos(ids, dir_path, write_path, file):
                 
                 # we know the id corresponds to rows: access_row:access_row+id_rows-1
 
-                # a user may have multiple education histories, so iterate through it
-                # we take the most recent 4 education experiences
+                # a user may have multiple work histories, so iterate through it
+                # we take the most recent 4 work experiences
 
-                for ipos in range(access_row, min(access_row+id_rows, access_row+5)):
+                for ipos in range(access_row, min(access_row+id_rows, access_row+4)):
                     dfs[ipos-access_row].iloc[id_index, 0:-1] = group_data.iloc[ipos, :]
                     dfs[ipos-access_row].loc[id_index, "updated"] = True
                 # move access_row forward to next id
                 access_row += id_rows
 
-        for pos_num in range(0,5):
+        for pos_num in range(0,4):
             dfs[pos_num].to_parquet(path_or_buf = "{write_path}/{file}_{igroup}_pos{pos_num}.parquet".format(write_path = write_path, file = file[0:-8], igroup = igroup, pos_num = pos_num), index = False)
 
 
 
 
 # read one user skill file to update df
-def update_skill(ids, dir_path, write_path, file):
+def read_skill(ids, dir_path, write_path, file):
 
     # construct file path
     file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
@@ -517,16 +514,16 @@ def update_skill(ids, dir_path, write_path, file):
 
 # read one data file and update df
 # ids is the target user id list, already sorted in ascending order
-def read_one_file(file_path, ids, df):
+def read_one_file(ids, dir_path, write_path, file):
 
-    # if "education" in file_path:
-    #     update_edu(ids, file_path, df)
-    # elif "user_part" in file_path:
-    #     update_prof(ids, file_path, df)
-    # elif "user_position" in file_path:
-    #     update_pos(ids, file_path, df)
-    # elif "user_skill" in file_path:
-    #     update_skill(ids, file_path, df)
+    if "education" in file:
+        read_edu(ids, dir_path, write_path, file)
+    elif "user_part" in file:
+        read_prof(ids, dir_path, write_path, file)
+    elif "user_position" in file:
+        read_pos(ids, dir_path, write_path, file)
+    elif "user_skill" in file:
+        read_skill(ids, dir_path, write_path, file)
     return
 
 
@@ -536,32 +533,32 @@ def read_one_file(file_path, ids, df):
 
 # It's assumed that a folder "US_EDUC" exists in dir_path and contains all the user data
 # construct the full sample
-def construct_user_data(dir_path):
+# def construct_user_data(dir_path):
 
-    # read the target id data
-    ids = pq.read_table("{dir_path}/unique_user_id_US_EDUC.parquet".format(dir_path=dir_path))
-    # sort user id: later would useful in filtering
-    ids = ids.sort_by("user_id")
+#     # read the target id data
+#     ids = pq.read_table("{dir_path}/unique_user_id_US_EDUC.parquet".format(dir_path=dir_path))
+#     # sort user id: later would useful in filtering
+#     ids = ids.sort_by("user_id")
 
-    print("user id list read")
+#     print("user id list read")
 
-    # create an empty DataFrame according to user_id
-    numrows = ids.num_rows
-    dt = {"user_id": ids.column("user_id"), "user_prof": pd.Series([user()] * numrows), "skill": pd.Series([skill()] * numrows), "edu1": pd.Series([edu()] * numrows), "edu2": pd.Series([edu()] * numrows), "edu3": pd.Series([edu()] * numrows), "edu4": pd.Series([edu()] * numrows), "pos1": pd.Series([pos()] * numrows), "pos2": pd.Series([pos()] * numrows), "pos3": pd.Series([pos()] * numrows), "pos4": pd.Series([pos()] * numrows) }
-    df = pd.DataFrame(dt)
-    # set the datatype of each column
-    # df.astype({"user_id":np.int64, "user_prof":user, "skill":skill, "edu1":edu, "edu2":edu, "edu3":edu, "edu4":edu, "pos1": pos, "pos2": pos, "pos3":pos, "pos4":pos })
+#     # create an empty DataFrame according to user_id
+#     numrows = ids.num_rows
+#     dt = {"user_id": ids.column("user_id"), "user_prof": pd.Series([user()] * numrows), "skill": pd.Series([skill()] * numrows), "edu1": pd.Series([edu()] * numrows), "edu2": pd.Series([edu()] * numrows), "edu3": pd.Series([edu()] * numrows), "edu4": pd.Series([edu()] * numrows), "pos1": pd.Series([pos()] * numrows), "pos2": pd.Series([pos()] * numrows), "pos3": pd.Series([pos()] * numrows), "pos4": pd.Series([pos()] * numrows) }
+#     df = pd.DataFrame(dt)
+#     # set the datatype of each column
+#     # df.astype({"user_id":np.int64, "user_prof":user, "skill":skill, "edu1":edu, "edu2":edu, "edu3":edu, "edu4":edu, "pos1": pos, "pos2": pos, "pos3":pos, "pos4":pos })
 
-    print("df created")
+#     print("df created")
 
-    file_list = os.listdir("{dir_path}/US_EDUC".format(dir_path=dir_path))
+#     file_list = os.listdir("{dir_path}/US_EDUC".format(dir_path=dir_path))
 
-    # iterate file_list, read the data and update df
-    for file in file_list:
-        print("start reading {file}".format(file=file))
-        read_one_file("{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file), ids, df)
-        print("finish reading {file}".format(file=file))
-    return df
+#     # iterate file_list, read the data and update df
+#     for file in file_list:
+#         print("start reading {file}".format(file=file))
+#         read_one_file("{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file), ids, df)
+#         print("finish reading {file}".format(file=file))
+#     return df
 
 # reads each file separately and write to data
 def read_data_separate(dir_path, write_path, file_list):
@@ -585,14 +582,14 @@ def read_data_separate(dir_path, write_path, file_list):
             # file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
             # dt = {"user_id": ids.column("user_id"), "edu1": pd.Series([edu()] * numrows), "edu2": pd.Series([edu()] * numrows), "edu3": pd.Series([edu()] * numrows), "edu4": pd.Series([edu()] * numrows), "updated": [False] * numrows}
             # df = pd.DataFrame(dt)
-            update_edu(ids, dir_path, write_path, file)
+            read_edu(ids, dir_path, write_path, file)
             # df.to_parquet(path = "../data_clean/{file}.parquet".format(file=file))
         
         elif "user_part" in file:
             # file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
             # dt = {"user_id": ids.column("user_id"), "user_prof": pd.Series([user()] * numrows), "updated": [False] * numrows }
             # df = pd.DataFrame(dt)
-            update_prof(ids, dir_path, write_path, file)
+            read_prof(ids, dir_path, write_path, file)
             # df.to_parquet(path = "../data_clean/{file}.parquet".format(file=file))
 
         elif "user_position" in file:
@@ -600,7 +597,7 @@ def read_data_separate(dir_path, write_path, file_list):
             # file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
             # dt = {"user_id": ids.column("user_id"), "pos1": pd.Series([pos()] * numrows), "pos2": pd.Series([pos()] * numrows), "pos3": pd.Series([pos()] * numrows), "pos4": pd.Series([pos()] * numrows), "updated": [False] * numrows }
             # df = pd.DataFrame(dt)
-            update_pos(ids, dir_path, write_path, file)
+            read_pos(ids, dir_path, write_path, file)
             # df.to_parquet(path = "../data_clean/{file}.parquet".format(file=file))
 
         elif "user_skill" in file:
@@ -608,7 +605,7 @@ def read_data_separate(dir_path, write_path, file_list):
             # file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
             # dt = {"user_id": ids.column("user_id"), "skill": pd.Series([skill()] * numrows), "updated": [False] * numrows }
             # df = pd.DataFrame(dt)
-            update_skill(ids, dir_path, write_path, file)
+            read_skill(ids, dir_path, write_path, file)
             # df.to_parquet(path = "../data_clean/{file}.parquet".format(file=file))
 
         print("finish reading {file}".format(file=file))
