@@ -25,7 +25,7 @@ WRITE_PATH = "../data_clean"
 
 FILE_LIST = os.listdir("{dir_path}/US_EDUC".format(dir_path=DATA_PATH))
 
-
+# TODO: change the i value below for each file, and change the -n config in mpi_read.sh
 # i takes values from 0-21, since there are 22 data files
 # the corresponding number of row groups are
 # [81, 82, 81, 82, 12, 15, 60, 8, 80, 15, 15, 83, 15, 11, 81, 15, 15, 15, 80, 15, 15, 11]

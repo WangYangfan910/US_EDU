@@ -18,4 +18,4 @@
 source ../../miniconda3/bin/activate
 conda activate py_env
 module load OpenMPI/4.1.6 
-mpirun -n $SLURM_NTASKS python run_mpi.py
+mpirun -n $SLURM_NTASKS python read_group_mpi.py
