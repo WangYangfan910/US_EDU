@@ -32,8 +32,9 @@ FILE_LIST = os.listdir("{dir_path}/US_EDUC".format(dir_path=DATA_PATH))
 # the number of tasks in the .sh file should be the same as the number of row groups in the data file to be read
 i = 0
 row_group_list = [81, 82, 81, 82, 12, 15, 60, 8, 80, 15, 15, 83, 15, 11, 81, 15, 15, 15, 80, 15, 15, 11]
-file = "{dir_path}/US_EDUC/{file_name}".format(dir_path = DATA_PATH, file_name = FILE_LIST[i])
+file = FILE_LIST[i]
 row_group_num = row_group_list[i]
+print("in total", row_group_num, "row groups")
 
 
 ########################################################
@@ -52,7 +53,8 @@ rank = comm.Get_rank()
 if rank == 0:
     print("this is process:", rank, "of", num_process)
 
-    ids = pq.read_table("{dir_path}/unique_user_id_US_EDUC.parquet".format(dir_path=DATA_PATH))
+    ids = pq.read_table("{dir_path}/unique_user_id_US_EDUC.parquet".format(dir_path=DATA_PATH)).to_pandas()
+    ids.sort_values("user_id", inplace = True)
     # file_list = os.listdir("{dir_path}/US_EDUC".format(dir_path=DATA_PATH))
 
     # send ids and file names to worker nodes
@@ -70,7 +72,7 @@ if rank == 0:
 #################### Worker Node #######################
 ########################################################
 
-elif rank == 1:
+else:
     print("this is process:", rank, "of", num_process)
 
     data = comm.recv(source=0, tag=11)

@@ -1,5 +1,5 @@
 # import packages
-import read_data as rd
+import read_group as rg
 import pandas as pd
 import pyarrow.parquet as pq
 import os
@@ -7,8 +7,8 @@ import multiprocessing
 
 
 # set constants and data path
-DATA_PATH = "../data"
-WRITE_PATH = "../data_clean"
+DATA_PATH = "/media/manbobo/UltraP/Research/USEdu/data"
+WRITE_PATH = "/media/manbobo/UltraP/Research/USEdu/data_clean"
 
 # obtain file list
 file_list = os.listdir("{dir_path}/US_EDUC".format(dir_path=DATA_PATH))
@@ -26,7 +26,7 @@ ids = pq.read_table("{dir_path}/unique_user_id_US_EDUC.parquet".format(dir_path=
 ids = ids.sort_by("user_id")
 
 # try reading on edu file
-rd.read_one_file(ids, DATA_PATH, WRITE_PATH, edu_list[0])
+rg.read_one_group(ids, DATA_PATH, WRITE_PATH, file_list[0], 0)
 
 
 # if __name__ == "__main__":

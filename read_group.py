@@ -8,6 +8,8 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 import itertools
+import copy
+import array as arr
 from datetime import date
 
 
@@ -30,7 +32,7 @@ from datetime import date
 
 # define the tuple of varaibles for each file type
 
-edu_var = ("user_id",
+edu_var = (
     "university_raw", 
     "university_name", 
     "education_number", 
@@ -46,7 +48,11 @@ edu_var = ("user_id",
     "university_location",
     "updated")
 
-edu_default = ( 0, # "user_id",
+edu_dtype = (
+
+)
+
+edu_default = ( 
                 "none", # "university_raw", 
                 "none", # "university_name", 
                 0, # "education_number", 
@@ -63,7 +69,7 @@ edu_default = ( 0, # "user_id",
                 False)# "updated" 
 
 
-user_var= ("user_id",
+user_var= (
     "firstname",
     "lastname",
     "fullname",
@@ -89,7 +95,7 @@ user_var= ("user_id",
     "updated" )
 
 
-user_default= (0, # "user_id",
+user_default= (
                "none", # "firstname",
                 "none", # "lastname",
                 "none", # "fullname",
@@ -116,7 +122,7 @@ user_default= (0, # "user_id",
 
 
 
-pos_var = ("user_id",
+pos_var = (
     "position_id",
     "company_raw",
     "company_linkedin_url",
@@ -162,7 +168,7 @@ pos_var = ("user_id",
     "title_translated",
     "updated")
 
-pos_default = ( 0, # "user_id",
+pos_default = ( 
                 0, # "position_id",
                 "none", # "company_raw",
                 "none", # "company_linkedin_url",
@@ -209,7 +215,7 @@ pos_default = ( 0, # "user_id",
                 False)# "updated")
             
 
-skill_var = ("user_id",
+skill_var = (
     "skill_raw",
     "skill_source",
     "skill_mapped",
@@ -218,7 +224,7 @@ skill_var = ("user_id",
     "skill_k75",
     "updated")
 
-skill_default = ( 0, # "user_id",
+skill_default = ( 
                 "none", # "skill_raw",
                 "none", # "skill_source",
                 "none", # "skill_mapped",
@@ -226,6 +232,58 @@ skill_default = ( 0, # "user_id",
                 "none", # "skill_k50",
                 "none", # "skill_k75",
                 False)# "updated")
+
+
+
+########################################################
+################## SMALL FUNCTIONS #####################
+########################################################
+
+def count_occurrence(df, col, val):
+    
+    count = 0
+    for df_val in df[col]:
+        if df_val == val:
+            count += 1
+    
+    return count
+
+
+
+def find_index(df, col, val):
+    # if found, return the index
+    for irow in df.index:
+        if df.at[irow, col] == val:
+            return irow
+
+    # not found, return -1
+    return -1
+
+
+def make_default_list(default_val, rep_time, num_rows):
+    return_lt = []
+    if rep_time > 1:
+        
+        for _ in range(0, num_rows):
+            return_lt.append([default_val] * rep_time)
+    else:
+        for _ in range(0, num_rows):
+            return_lt.append(default_val)
+
+    return return_lt
+
+
+def make_default_nparray(default_val, dtype, rep_time, num_rows):
+    return_lt = []
+    if rep_time > 1:
+        
+        for _ in range(0, num_rows):
+            return_lt.append(np.array([default_val]* rep_time, dtype=dtype))
+    else:
+        for _ in range(0, num_rows):
+            return_lt.append(default_val)
+
+    return return_lt
 
 
 
@@ -240,9 +298,9 @@ def read_prof(ids, dir_path, write_path, file, row_group):
     file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
 
     # obtain the min and max target id
-    min_id = ids.column("user_id")[0].as_py()
-    max_id = ids.column("user_id")[-1].as_py()
-    numrows = ids.num_rows
+    # min_id = ids.column("user_id")[0].as_py()
+    # max_id = ids.column("user_id")[-1].as_py()
+    # numrows = ids.num_rows
 
     print("reading row group: ", row_group)
     
@@ -250,15 +308,32 @@ def read_prof(ids, dir_path, write_path, file, row_group):
     handle = pq.ParquetFile("{file_path}".format(file_path=file_path))
     group_data = handle.read_row_group(row_group).to_pandas()
 
-    # select only the subset with user id within the target id range
-    group_data = group_data[(group_data["user_id"] >= min_id) & (group_data["user_id"] <= max_id)]
+    # find the common ids -- to reduce df size
+    common_ids = set(ids["user_id"]).intersection(set(group_data["user_id"]))
+    common_ids = list(common_ids)
+    numrows = len(common_ids)
+
+    # select only the subset with common user id
+    group_data = group_data[group_data["user_id"].isin(common_ids)]
+    
+    # reset the data row index
+    leng = group_data.shape[0]
+    group_data.index = range(0,leng)
 
     print("group data extracted")
+    
 
     # create dataframes for storing data, 
-    dt = {field_name: [field_default] * numrows for (field_name, field_default) in itertools.zip_longest(user_var, user_default)}
-    dt["user_id"] = ids.column("user_id")
+    dt = {field_name: make_default_list(field_default, 1, numrows) for (field_name, field_default) in itertools.zip_longest(user_var, user_default)}
+    # dt = {field_name: [field_default] * numrows for (field_name, field_default) in itertools.zip_longest(user_var, user_default)}
+
+    dt["user_id"] = common_ids
     df = pd.DataFrame(dt)
+
+    # record col names except user_id and updated
+    col_names = df.columns.to_list()
+    col_names.remove("user_id")
+    col_names.remove("updated")
 
     print("df created")
     
@@ -270,7 +345,9 @@ def read_prof(ids, dir_path, write_path, file, row_group):
     
     for eachid in data_ids:
         # check whether this id is in the target id list
-        id_index = ids.column("user_id").index(eachid).as_py()
+        # id_index = ids.column("user_id").index(eachid).as_py()
+        id_index = find_index(df, "user_id", eachid)
+        # access_row = find_index(group_data, "user_id", eachid)
         if id_index == -1:
             # return index -1, this id not in ids, update the access row and continue to next id
             access_row += 1
@@ -280,14 +357,17 @@ def read_prof(ids, dir_path, write_path, file, row_group):
             # each user has only one row, so use the access row to construct a user object
             # update df
 
-            df.iloc[id_index, 0:-1] = group_data.iloc[access_row, :]
-            df.loc[id_index, "updated"] = True
+            for col in col_names:
+            
+                df.at[id_index, col] = group_data.at[access_row, col]
+            
+            df.at[id_index, "updated"] = True
 
             # update the current access row
             access_row += 1 
 
 
-    df.to_parquet(path_or_buf = "{write_path}/{file}_{row_group}.parquet".format(write_path = write_path, file=file[0:-8], row_group = row_group), index = False)
+    df.to_parquet(path_or_buf = "{write_path}/{file}_rowgroup{row_group}.parquet".format(write_path = write_path, file=file[0:-8], row_group = row_group), index = False)
 
                 
 
@@ -300,9 +380,9 @@ def read_edu(ids, dir_path, write_path, file, row_group):
     file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
 
     # obtain the min and max target id
-    min_id = ids.column("user_id")[0].as_py()
-    max_id = ids.column("user_id")[-1].as_py()
-    numrows = ids.num_rows
+    # min_id = ids.column("user_id")[0].as_py()
+    # max_id = ids.column("user_id")[-1].as_py()
+    # numrows = ids.num_rows
 
     print("reading row group:", row_group)
 
@@ -310,30 +390,58 @@ def read_edu(ids, dir_path, write_path, file, row_group):
     handle = pq.ParquetFile("{file_path}".format(file_path=file_path))
     group_data = handle.read_row_group(row_group).to_pandas()
     
+
+    # find the common ids -- to reduce df size
+    common_ids = set(ids["user_id"]).intersection(set(group_data["user_id"]))
+    common_ids = list(common_ids)
+    numrows = len(common_ids)
+
+    # select only the subset with common user id
+    group_data = group_data[group_data["user_id"].isin(common_ids)]
+
     # select only the subset with user id within the target id range
-    group_data = group_data[(group_data["user_id"] >= min_id) & (group_data["user_id"] <= max_id)]
-
-    print("group data extracted")
-
-    dt = {field_name: [field_default] * numrows for (field_name, field_default) in itertools.zip_longest(edu_var, edu_default)}
-    dt["user_id"] = ids.column("user_id")
-    df1 = pd.DataFrame(dt)
-    df2 = pd.DataFrame(dt)
-    df3 = pd.DataFrame(dt)
-    df4 = pd.DataFrame(dt)
-    df5 = pd.DataFrame(dt)
-    dfs = (df1, df2, df3, df4, df5)
-    print("dfs created")
+    # group_data = group_data[(group_data["user_id"] >= min_id) & (group_data["user_id"] <= max_id)]
     
-
     # select only the subset with at most 6 edu entries
     remove_id = pd.unique(group_data[group_data["education_number"] > 6]["user_id"])
     group_data = group_data[~group_data["user_id"].isin(remove_id)]
 
+
     # sort by id and enddate
-    group_data.sort_values(["user_id", "enddate"], inplace = True)
+    group_data = group_data.sort_values(["user_id", "enddate"])
+
+    print("group data sorted")
+
+    # reset data row index
+    leng = group_data.shape[0]
+    group_data.index = range(0, leng)
+
+
+    print("group data extracted")
+
+    dt = {field_name: make_default_list(field_default, 5, numrows) for (field_name, field_default) in itertools.zip_longest(edu_var, edu_default)}
+    # dt = {field_name: [arr.array("u", (field_default, field_default, field_default, field_default, field_default))] for (field_name, field_default) in itertools.zip_longest(edu_var, edu_default)}
+
+    dt["user_id"] = common_ids
+    # df1 = pd.DataFrame(dt)
+    # df2 = pd.DataFrame(dt)
+    # df3 = pd.DataFrame(dt)
+    # df4 = pd.DataFrame(dt)
+    # dfs = (df1, df2, df3, df4, df5)
+    df = pd.DataFrame(dt)
+    # reset df row index
+   
+   
+    # record col names except user_id and updated
+    col_names = df.columns.to_list()
+    col_names.remove("user_id")
+    col_names.remove("updated")
+
+    print("dfs created")
     
-    data_rows = group_data.shape[0]
+    
+    
+    # data_rows = group_data.shape[0]
     
     # use access_row to record the current scan row
     access_row = 0
@@ -341,17 +449,24 @@ def read_edu(ids, dir_path, write_path, file, row_group):
     # retrieve the id list of this data subset
     data_ids = pd.unique(group_data["user_id"])
 
+    print("start iterating ids")
     # assumption: assume each id is associated with at most 10 rows
     # which is innocuous since we select people with at most 6 education histories
     for eachid in data_ids:
 
+        print("id", eachid)
+
         # check how many rows this id is associated
-        sub_data = group_data[access_row:min(access_row+10, data_rows)]
+        # sub_data = group_data[access_row:min(access_row+10, data_rows)]
         # use id_rows to record the num of rows associated with one id
-        id_rows = sub_data[sub_data["user_id"] == eachid].shape[0]
+        
+        # id_rows = sub_data[sub_data["user_id"] == eachid].shape[0]
+        id_rows = count_occurrence(group_data, "user_id", eachid)
+        # access_row = find_index(group_data, "user_id", eachid)
 
         # check whether this id is in the target id list
-        id_index = ids.column("user_id").index(eachid).as_py()
+        # id_index = ids.column("user_id").index(eachid).as_py()
+        id_index = find_index(df, "user_id", eachid)
         if id_index == -1:
             # return index -1, this id not in ids, update continue to next id
             access_row += id_rows
@@ -362,16 +477,28 @@ def read_edu(ids, dir_path, write_path, file, row_group):
 
             # a user may have multiple education histories, so iterate through it
             # we take the most recent 5 education experiences
-
+            print("start recording")
             for iedu in range(access_row, min(access_row+id_rows, access_row+5)):
                 
-                dfs[iedu-access_row].iloc[id_index, 0:-1] = group_data.iloc[iedu, :]
-                dfs[iedu-access_row].loc[id_index, "updated"] = True
+                print("id_rows =", id_rows)
+                print("id_index =", id_index)
+                print("iedu =",iedu)
+                print("access_row =", access_row)
+
+                for col in col_names:
+                    print("recording", col)
+                    print("updating id_index =", id_index)
+                    print("before update:", df.at[id_index, col])
+                    df.at[id_index, col][iedu-access_row] = group_data.at[iedu, col]
+                    print("after update:", df.at[id_index, col])
+                
+                df.at[id_index, "updated"][iedu-access_row] = True
+            
             # move access_row forward to next id
             access_row += id_rows
     
-    for edu_num in range(0,5):
-        dfs[edu_num].to_parquet(path_or_buf = "{write_path}/{file}_{row_group}_edu{edu_num}.parquet".format(write_path = write_path, file = file[0:-8], row_group = row_group, edu_num = edu_num), index = False)
+    # for edu_num in range(0,5):
+    df.to_parquet(path_or_buf = "{write_path}/{file}_rowgroup{row_group}.parquet".format(write_path = write_path, file = file[0:-8], row_group = row_group), index = False)
             
 
 
@@ -383,30 +510,48 @@ def read_pos(ids, dir_path, write_path, file, row_group):
     file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
 
     # obtain the min and max target id
-    min_id = ids.column("user_id")[0].as_py()
-    max_id = ids.column("user_id")[-1].as_py()
-    numrows = ids.num_rows
+    # min_id = ids.column("user_id")[0].as_py()
+    # max_id = ids.column("user_id")[-1].as_py()
+    # numrows = ids.num_rows
 
     print("reading row group: ", row_group)
     # establish the data input stream
     handle = pq.ParquetFile("{file_path}".format(file_path=file_path))
     group_data = handle.read_row_group(row_group).to_pandas()
 
-    # select only the subset with user id within the target id range
-    group_data = group_data[(group_data["user_id"] >= min_id) & (group_data["user_id"] <= max_id)]
+
+    # find the common ids -- to reduce df size
+    common_ids = set(ids["user_id"]).intersection(set(group_data["user_id"]))
+    common_ids = list(common_ids)
+    numrows = len(common_ids)
+
+
+    # select only the subset with common user id
+    group_data = group_data[group_data["user_id"].isin(common_ids)]
 
     # sort by id and enddate
-    group_data.sort_values(["user_id", "enddate"], inplace = True)
+    group_data = group_data.sort_values(["user_id", "enddate"])
+
+    # reset data row index
+    leng = group_data.shape[0]
+    group_data.index = range(0, leng)
 
     print("group data extracted")
 
-    dt = {field_name: [field_default] * numrows for (field_name, field_default) in itertools.zip_longest(pos_var, pos_default)}
-    dt["user_id"] = ids.column("user_id")
-    df1 = pd.DataFrame(dt)
-    df2 = pd.DataFrame(dt)
-    df3 = pd.DataFrame(dt)
-    df4 = pd.DataFrame(dt)
-    dfs = (df1, df2, df3, df4)
+    dt = {field_name: make_default_list(field_default, 4, numrows) for (field_name, field_default) in itertools.zip_longest(pos_var, pos_default)}
+    dt["user_id"] = common_ids
+    # df1 = pd.DataFrame(dt)
+    # df2 = pd.DataFrame(dt)
+    # df3 = pd.DataFrame(dt)
+    # df4 = pd.DataFrame(dt)
+    # dfs = (df1, df2, df3, df4)
+
+    df = pd.DataFrame(dt)
+
+    # record col names except user_id and updated
+    col_names = df.columns.to_list()
+    col_names.remove("user_id")
+    col_names.remove("updated")
 
     print("df created")
     
@@ -422,12 +567,16 @@ def read_pos(ids, dir_path, write_path, file, row_group):
     for eachid in data_ids:
 
         # check how many rows this id is associated
-        sub_data = group_data.iloc[access_row:,0]
+        # sub_data = group_data.iloc[access_row:,0]
         # use id_rows to record the num of rows associated with one id
-        id_rows = sub_data[sub_data["user_id"] == eachid].shape[0]
+
+        # id_rows = sub_data[sub_data["user_id"] == eachid].shape[0]
+        id_rows = count_occurrence(group_data, "user_id", eachid)
 
         # check whether this id is in the target id list
-        id_index = ids.column("user_id").index(eachid).as_py()
+        # id_index = ids.column("user_id").index(eachid).as_py()
+        id_index = find_index(df, "user_id", eachid)
+        # access_row = find_index(group_data, "user_id", eachid)
         if id_index == -1:
             # return index -1, this id not in ids, update continue to next id
             access_row += id_rows
@@ -440,13 +589,16 @@ def read_pos(ids, dir_path, write_path, file, row_group):
             # we take the most recent 4 work experiences
 
             for ipos in range(access_row, min(access_row+id_rows, access_row+4)):
-                dfs[ipos-access_row].iloc[id_index, 0:-1] = group_data.iloc[ipos, :]
-                dfs[ipos-access_row].loc[id_index, "updated"] = True
+                
+                for col in col_names:
+                    df.at[id_index, col][ipos-access_row] = group_data.at[ipos, col]
+                
+                df.at[id_index, "updated"][ipos-access_row] = True
             # move access_row forward to next id
             access_row += id_rows
 
-    for pos_num in range(0,4):
-        dfs[pos_num].to_parquet(path_or_buf = "{write_path}/{file}_{row_group}_pos{pos_num}.parquet".format(write_path = write_path, file = file[0:-8], row_group = row_group, pos_num = pos_num), index = False)
+    # for pos_num in range(0,4):
+    df.to_parquet(path_or_buf = "{write_path}/{file}_rowgroup{row_group}.parquet".format(write_path = write_path, file = file[0:-8], row_group = row_group), index = False)
 
 
 
@@ -458,9 +610,9 @@ def read_skill(ids, dir_path, write_path, file, row_group):
     file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
 
     # obtain the min and max target id
-    min_id = ids.column("user_id")[0].as_py()
-    max_id = ids.column("user_id")[-1].as_py()
-    numrows = ids.num_rows
+    # min_id = ids.column("user_id")[0].as_py()
+    # max_id = ids.column("user_id")[-1].as_py()
+    # numrows = ids.num_rows
 
     print("reading row group: ", row_group)
 
@@ -468,15 +620,32 @@ def read_skill(ids, dir_path, write_path, file, row_group):
     handle = pq.ParquetFile("{file_path}".format(file_path=file_path))
     group_data = handle.read_row_group(row_group).to_pandas()
 
-    # select only the subset with user id within the target id range
-    group_data = group_data[(group_data["user_id"] >= min_id) & (group_data["user_id"] <= max_id)]
+    # find the common ids -- to reduce df size
+    common_ids = set(ids["user_id"]).intersection(set(group_data["user_id"]))
+    common_ids = list(common_ids)
+    numrows = len(common_ids)
+
+
+    # select only the subset with common user id
+    group_data = group_data[group_data["user_id"].isin(common_ids)]
+
+
+    # reset data row index
+    leng = group_data.shape[0]
+    group_data.index = range(0, leng)
 
     print("group data extracted")
 
     # create dataframes for storing data,
-    dt = {field_name: [field_default] * numrows for (field_name, field_default) in itertools.zip_longest(skill_var, skill_default)}
-    dt["user_id"] = ids.column("user_id")
+    dt = {field_name: make_default_list(field_default, 1, numrows) for (field_name, field_default) in itertools.zip_longest(skill_var, skill_default)}
+    dt["user_id"] = common_ids
     df = pd.DataFrame(dt)
+
+    col_names = df.columns.to_list()
+    col_names.remove("user_id")
+    col_names.remove("updated")
+
+    print("df created")
 
     access_row = 0
 
@@ -486,7 +655,9 @@ def read_skill(ids, dir_path, write_path, file, row_group):
     
     for eachid in data_ids:
         # check whether this id is in the target id list
-        id_index = ids.column("user_id").index(eachid).as_py()
+        # id_index = ids.column("user_id").index(eachid).as_py()
+        id_index = find_index(df, "user_id", eachid)
+        # access_row = find_index(group_data, "user_id", eachid)
         if id_index == -1:
             # return index -1, this id not in ids, update the access row and continue to next id
             access_row += 1
@@ -495,12 +666,14 @@ def read_skill(ids, dir_path, write_path, file, row_group):
             
             # each user has only one row, so use the access row to construct a user object
             # update df
-            df.iloc[id_index, 0:-1] = group_data.iloc[access_row, :]
-            df.loc[id_index, "updated"] = True
+            for col in col_names:
+                df.at[id_index, col] = group_data.at[access_row, col]
+            
+            df.at[id_index, "updated"] = True
             # update the current access row
             access_row += 1
 
-    df.to_parquet(path_or_buf = "{write_path}/{file}_{row_group}.parquet".format(write_path = write_path, file=file[0:-8], row_group = row_group), index = False)
+    df.to_parquet(path_or_buf = "{write_path}/{file}_rowgroup{row_group}.parquet".format(write_path = write_path, file=file[0:-8], row_group = row_group), index = False)
 
 
 
