@@ -454,7 +454,7 @@ def read_edu(ids, dir_path, write_path, file, row_group):
     # which is innocuous since we select people with at most 6 education histories
     for eachid in data_ids:
 
-        print("id", eachid)
+        print("reading id:", eachid)
 
         # check how many rows this id is associated
         # sub_data = group_data[access_row:min(access_row+10, data_rows)]
@@ -477,20 +477,20 @@ def read_edu(ids, dir_path, write_path, file, row_group):
 
             # a user may have multiple education histories, so iterate through it
             # we take the most recent 5 education experiences
-            print("start recording")
+            # print("start recording")
             for iedu in range(access_row, min(access_row+id_rows, access_row+5)):
                 
-                print("id_rows =", id_rows)
-                print("id_index =", id_index)
-                print("iedu =",iedu)
-                print("access_row =", access_row)
+                # print("id_rows =", id_rows)
+                # print("id_index =", id_index)
+                # print("iedu =",iedu)
+                # print("access_row =", access_row)
 
                 for col in col_names:
-                    print("recording", col)
-                    print("updating id_index =", id_index)
-                    print("before update:", df.at[id_index, col])
+                    # print("recording", col)
+                    # print("updating id_index =", id_index)
+                    # print("before update:", df.at[id_index, col])
                     df.at[id_index, col][iedu-access_row] = group_data.at[iedu, col]
-                    print("after update:", df.at[id_index, col])
+                    # print("after update:", df.at[id_index, col])
                 
                 df.at[id_index, "updated"][iedu-access_row] = True
             
