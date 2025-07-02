@@ -342,8 +342,11 @@ def read_prof(ids, dir_path, write_path, file, row_group):
     # retrieve the id list of this row group, which is unique for user profile
     data_ids = pd.unique(group_data["user_id"])
 
+    num_read = 0
     
     for eachid in data_ids:
+
+        num_read += 1
         # check whether this id is in the target id list
         # id_index = ids.column("user_id").index(eachid).as_py()
         id_index = find_index(df, "user_id", eachid)
@@ -365,6 +368,10 @@ def read_prof(ids, dir_path, write_path, file, row_group):
 
             # update the current access row
             access_row += 1 
+        
+        # report progress
+        if num_read % 1000 == 0:
+            print(num_read / numrows * 100, "percent read")
 
 
     df.to_parquet(path_or_buf = "{write_path}/{file}_rowgroup{row_group}.parquet".format(write_path = write_path, file=file[0:-8], row_group = row_group), index = False)
@@ -449,10 +456,14 @@ def read_edu(ids, dir_path, write_path, file, row_group):
     # retrieve the id list of this data subset
     data_ids = pd.unique(group_data["user_id"])
 
+    num_read = 0
+
     print("start iterating ids")
     # assumption: assume each id is associated with at most 10 rows
     # which is innocuous since we select people with at most 6 education histories
     for eachid in data_ids:
+
+        num_read += 1
 
         print("reading id:", eachid)
 
@@ -496,7 +507,12 @@ def read_edu(ids, dir_path, write_path, file, row_group):
             
             # move access_row forward to next id
             access_row += id_rows
-    
+
+        # report progress
+        if num_read % 1000 == 0:
+            print(num_read / numrows * 100, "percent read")
+
+
     # for edu_num in range(0,5):
     df.to_parquet(path_or_buf = "{write_path}/{file}_rowgroup{row_group}.parquet".format(write_path = write_path, file = file[0:-8], row_group = row_group), index = False)
             
@@ -563,8 +579,12 @@ def read_pos(ids, dir_path, write_path, file, row_group):
     
     # retrieve the id list of this data subset
     data_ids = pd.unique(group_data["user_id"])
+
+    num_read = 0
     
     for eachid in data_ids:
+
+        num_read += 1
 
         # check how many rows this id is associated
         # sub_data = group_data.iloc[access_row:,0]
@@ -596,6 +616,10 @@ def read_pos(ids, dir_path, write_path, file, row_group):
                 df.at[id_index, "updated"][ipos-access_row] = True
             # move access_row forward to next id
             access_row += id_rows
+
+        # report progress
+        if num_read % 1000 == 0:
+            print(num_read / numrows * 100, "percent read")
 
     # for pos_num in range(0,4):
     df.to_parquet(path_or_buf = "{write_path}/{file}_rowgroup{row_group}.parquet".format(write_path = write_path, file = file[0:-8], row_group = row_group), index = False)
@@ -652,8 +676,11 @@ def read_skill(ids, dir_path, write_path, file, row_group):
     # retrieve the id list of this row group, which is unique for user profile
     data_ids = pd.unique(group_data["user_id"])
 
+    num_read = 0
     
     for eachid in data_ids:
+
+        num_read += 1
         # check whether this id is in the target id list
         # id_index = ids.column("user_id").index(eachid).as_py()
         id_index = find_index(df, "user_id", eachid)
@@ -672,6 +699,10 @@ def read_skill(ids, dir_path, write_path, file, row_group):
             df.at[id_index, "updated"] = True
             # update the current access row
             access_row += 1
+
+        # report progress
+        if num_read % 1000 == 0:
+            print(num_read / numrows * 100, "percent read")
 
     df.to_parquet(path_or_buf = "{write_path}/{file}_rowgroup{row_group}.parquet".format(write_path = write_path, file=file[0:-8], row_group = row_group), index = False)
 
