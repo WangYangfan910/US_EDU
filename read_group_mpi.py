@@ -31,6 +31,7 @@ FILE_LIST = os.listdir("{dir_path}/US_EDUC".format(dir_path=DATA_PATH))
 # [81, 82, 81, 82, 12, 15, 60, 8, 80, 15, 15, 83, 15, 11, 81, 15, 15, 15, 80, 15, 15, 11]
 # the number of tasks in the .sh file should be the same as the number of row groups in the data file to be read
 i = 0
+c_per_group = 10
 row_group_list = [81, 82, 81, 82, 12, 15, 60, 8, 80, 15, 15, 83, 15, 11, 81, 15, 15, 15, 80, 15, 15, 11]
 file = FILE_LIST[i]
 row_group_num = row_group_list[i]
@@ -59,11 +60,12 @@ if rank == 0:
 
     # send ids and file names to worker nodes
     for node_num in range(1,num_process):
-        data = {'ids': ids, 'row_group': node_num}
+        
+        data = {'ids': ids, 'row_group': node_num // c_per_group, "c_rank": node_num % c_per_group}
         comm.send(data, dest=node_num, tag=11)
     
-    # use the remaining resource to read one file
-    rg.read_one_group(ids, DATA_PATH, WRITE_PATH, file, 0)
+    # use the remaining resource to read one part
+    rg.read_one_group(ids, DATA_PATH, WRITE_PATH, file, 0, c_per_group, 0)
 
 
 
@@ -78,7 +80,8 @@ else:
     data = comm.recv(source=0, tag=11)
     ids = data["ids"]
     row_group = data["row_group"]
-    rg.read_one_group(ids, DATA_PATH, WRITE_PATH, file, row_group)
+    c_rank = data["c_rank"]
+    rg.read_one_group(ids, DATA_PATH, WRITE_PATH, file, row_group, c_per_group, c_rank)
 
 
 

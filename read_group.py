@@ -8,8 +8,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 import itertools
-import copy
-import array as arr
+import math
 from datetime import date
 
 
@@ -273,18 +272,6 @@ def make_default_list(default_val, rep_time, num_rows):
     return return_lt
 
 
-def make_default_nparray(default_val, dtype, rep_time, num_rows):
-    return_lt = []
-    if rep_time > 1:
-        
-        for _ in range(0, num_rows):
-            return_lt.append(np.array([default_val]* rep_time, dtype=dtype))
-    else:
-        for _ in range(0, num_rows):
-            return_lt.append(default_val)
-
-    return return_lt
-
 
 
 ########################################################
@@ -292,7 +279,7 @@ def make_default_nparray(default_val, dtype, rep_time, num_rows):
 ########################################################
 
 # read one user profile file to update df
-def read_prof(ids, dir_path, write_path, file, row_group):
+def read_prof(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
     
     # construct file path
     file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
@@ -302,7 +289,7 @@ def read_prof(ids, dir_path, write_path, file, row_group):
     # max_id = ids.column("user_id")[-1].as_py()
     # numrows = ids.num_rows
 
-    print("reading row group: ", row_group)
+    print("reading row group: ", row_group, "part", c_rank)
     
     # establish the data input stream
     handle = pq.ParquetFile("{file_path}".format(file_path=file_path))
@@ -315,10 +302,17 @@ def read_prof(ids, dir_path, write_path, file, row_group):
 
     # select only the subset with common user id
     group_data = group_data[group_data["user_id"].isin(common_ids)]
-    
+
     # reset the data row index
     leng = group_data.shape[0]
     group_data.index = range(0,leng)
+
+    # divide group_data into c_per_group subsets
+    # select a subset of the data based on c_rank
+    perleng = int(math.ceil(leng / c_per_group))
+    group_data = group_data.iloc[c_rank * perleng : min((c_rank+1) * perleng - 1, leng-1)]
+    thisleng = group_data.shape[0]
+    group_data.index = range(0,thisleng)
 
     print("group data extracted")
     
@@ -374,14 +368,14 @@ def read_prof(ids, dir_path, write_path, file, row_group):
             print(num_read / numrows * 100, "percent read")
 
 
-    df.to_parquet(path_or_buf = "{write_path}/{file}_rowgroup{row_group}.parquet".format(write_path = write_path, file=file[0:-8], row_group = row_group), index = False)
+    df.to_parquet(path_or_buf = "{write_path}/{file}_rowgroup{row_group}_{c_rank}.parquet".format(write_path = write_path, file=file[0:-8], row_group = row_group, c_rank = c_rank), index = False)
 
                 
 
 
 # read one user edu file to update df
 # we just people with at most 4 education entries
-def read_edu(ids, dir_path, write_path, file, row_group):
+def read_edu(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
 
     # construct file path
     file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
@@ -391,7 +385,7 @@ def read_edu(ids, dir_path, write_path, file, row_group):
     # max_id = ids.column("user_id")[-1].as_py()
     # numrows = ids.num_rows
 
-    print("reading row group:", row_group)
+    print("reading row group: ", row_group, "part", c_rank)
 
     # establish the data input stream
     handle = pq.ParquetFile("{file_path}".format(file_path=file_path))
@@ -422,6 +416,13 @@ def read_edu(ids, dir_path, write_path, file, row_group):
     # reset data row index
     leng = group_data.shape[0]
     group_data.index = range(0, leng)
+
+    # divide group_data into c_per_group subsets
+    # select a subset of the data based on c_rank
+    perleng = int(math.ceil(leng / c_per_group))
+    group_data = group_data.iloc[c_rank * perleng : min((c_rank+1) * perleng - 1, leng-1)]
+    thisleng = group_data.shape[0]
+    group_data.index = range(0,thisleng)
 
 
     print("group data extracted")
@@ -514,14 +515,13 @@ def read_edu(ids, dir_path, write_path, file, row_group):
 
 
     # for edu_num in range(0,5):
-    df.to_parquet(path_or_buf = "{write_path}/{file}_rowgroup{row_group}.parquet".format(write_path = write_path, file = file[0:-8], row_group = row_group), index = False)
-            
+    df.to_parquet(path_or_buf = "{write_path}/{file}_rowgroup{row_group}_{c_rank}.parquet".format(write_path = write_path, file=file[0:-8], row_group = row_group, c_rank = c_rank), index = False)        
 
 
 
 # read one user position file to update df
 # take only the first 5 positions
-def read_pos(ids, dir_path, write_path, file, row_group):
+def read_pos(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
     # construct file path
     file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
 
@@ -530,7 +530,7 @@ def read_pos(ids, dir_path, write_path, file, row_group):
     # max_id = ids.column("user_id")[-1].as_py()
     # numrows = ids.num_rows
 
-    print("reading row group: ", row_group)
+    print("reading row group: ", row_group, "part", c_rank)
     # establish the data input stream
     handle = pq.ParquetFile("{file_path}".format(file_path=file_path))
     group_data = handle.read_row_group(row_group).to_pandas()
@@ -551,6 +551,13 @@ def read_pos(ids, dir_path, write_path, file, row_group):
     # reset data row index
     leng = group_data.shape[0]
     group_data.index = range(0, leng)
+
+    # divide group_data into c_per_group subsets
+    # select a subset of the data based on c_rank
+    perleng = int(math.ceil(leng / c_per_group))
+    group_data = group_data.iloc[c_rank * perleng : min((c_rank+1) * perleng - 1, leng-1)]
+    thisleng = group_data.shape[0]
+    group_data.index = range(0,thisleng)
 
     print("group data extracted")
 
@@ -622,13 +629,13 @@ def read_pos(ids, dir_path, write_path, file, row_group):
             print(num_read / numrows * 100, "percent read")
 
     # for pos_num in range(0,4):
-    df.to_parquet(path_or_buf = "{write_path}/{file}_rowgroup{row_group}.parquet".format(write_path = write_path, file = file[0:-8], row_group = row_group), index = False)
+    df.to_parquet(path_or_buf = "{write_path}/{file}_rowgroup{row_group}_{c_rank}.parquet".format(write_path = write_path, file=file[0:-8], row_group = row_group, c_rank = c_rank), index = False)
 
 
 
 
 # read one user skill file to update df
-def read_skill(ids, dir_path, write_path, file, row_group):
+def read_skill(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
 
     # construct file path
     file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
@@ -638,7 +645,7 @@ def read_skill(ids, dir_path, write_path, file, row_group):
     # max_id = ids.column("user_id")[-1].as_py()
     # numrows = ids.num_rows
 
-    print("reading row group: ", row_group)
+    print("reading row group: ", row_group, "part", c_rank)
 
     # establish the data input stream
     handle = pq.ParquetFile("{file_path}".format(file_path=file_path))
@@ -657,6 +664,13 @@ def read_skill(ids, dir_path, write_path, file, row_group):
     # reset data row index
     leng = group_data.shape[0]
     group_data.index = range(0, leng)
+
+    # divide group_data into c_per_group subsets
+    # select a subset of the data based on c_rank
+    perleng = int(math.ceil(leng / c_per_group))
+    group_data = group_data.iloc[c_rank * perleng : min((c_rank+1) * perleng - 1, leng-1)]
+    thisleng = group_data.shape[0]
+    group_data.index = range(0,thisleng)
 
     print("group data extracted")
 
@@ -704,22 +718,22 @@ def read_skill(ids, dir_path, write_path, file, row_group):
         if num_read % 1000 == 0:
             print(num_read / numrows * 100, "percent read")
 
-    df.to_parquet(path_or_buf = "{write_path}/{file}_rowgroup{row_group}.parquet".format(write_path = write_path, file=file[0:-8], row_group = row_group), index = False)
+    df.to_parquet(path_or_buf = "{write_path}/{file}_rowgroup{row_group}_{c_rank}.parquet".format(write_path = write_path, file=file[0:-8], row_group = row_group, c_rank = c_rank), index = False)
 
 
 
 # read one data file and update df
 # ids is the target user id list, already sorted in ascending order
-def read_one_group(ids, dir_path, write_path, file, row_group):
+def read_one_group(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
 
     if "education" in file:
-        read_edu(ids, dir_path, write_path, file, row_group)
+        read_edu(ids, dir_path, write_path, file, row_group, c_per_group, c_rank)
     elif "user_part" in file:
-        read_prof(ids, dir_path, write_path, file, row_group)
+        read_prof(ids, dir_path, write_path, file, row_group, c_per_group, c_rank)
     elif "user_position" in file:
-        read_pos(ids, dir_path, write_path, file, row_group)
+        read_pos(ids, dir_path, write_path, file, row_group, c_per_group, c_rank)
     elif "user_skill" in file:
-        read_skill(ids, dir_path, write_path, file, row_group)
+        read_skill(ids, dir_path, write_path, file, row_group, c_per_group, c_rank)
     return
 
 
