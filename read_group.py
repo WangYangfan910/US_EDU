@@ -10,6 +10,7 @@ import pyarrow.parquet as pq
 import itertools
 import math
 from datetime import date
+from datetime import datetime
 
 
 
@@ -369,7 +370,7 @@ def read_prof(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
             print(num_read / numrows * 100, "percent read")
 
 
-    df.to_parquet(path_or_buf = "{write_path}/{file}_rowgroup{row_group}_{c_rank}.parquet".format(write_path = write_path, file=file[0:-8], row_group = row_group, c_rank = c_rank), index = False)
+    df.to_parquet(path = "{write_path}/{file}_rowgroup{row_group}_{c_rank}.parquet".format(write_path = write_path, file=file[0:-8], row_group = row_group, c_rank = c_rank), index = False)
 
                 
 
@@ -517,7 +518,7 @@ def read_edu(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
 
 
     # for edu_num in range(0,5):
-    df.to_parquet(path_or_buf = "{write_path}/{file}_rowgroup{row_group}_{c_rank}.parquet".format(write_path = write_path, file=file[0:-8], row_group = row_group, c_rank = c_rank), index = False)        
+    df.to_parquet(path = "{write_path}/{file}_rowgroup{row_group}_{c_rank}.parquet".format(write_path = write_path, file=file[0:-8], row_group = row_group, c_rank = c_rank), index = False)        
 
 
 
@@ -621,7 +622,10 @@ def read_pos(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
             for ipos in range(access_row, min(access_row+id_rows, access_row+4)):
                 
                 for col in col_names:
-                    df.at[id_index, col][ipos-access_row] = group_data.at[ipos, col]
+                    if (col == "startdate") | (col == "enddate"):
+                        df.at[id_index, col][ipos-access_row] = datetime.strptime(group_data.at[ipos, col], "%Y-%m-%d")
+                    else:
+                        df.at[id_index, col][ipos-access_row] = group_data.at[ipos, col]
                 
                 df.at[id_index, "updated"][ipos-access_row] = True
             # move access_row forward to next id
@@ -632,7 +636,7 @@ def read_pos(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
             print(num_read / numrows * 100, "percent read")
 
     # for pos_num in range(0,4):
-    df.to_parquet(path_or_buf = "{write_path}/{file}_rowgroup{row_group}_{c_rank}.parquet".format(write_path = write_path, file=file[0:-8], row_group = row_group, c_rank = c_rank), index = False)
+    df.to_parquet(path = "{write_path}/{file}_rowgroup{row_group}_{c_rank}.parquet".format(write_path = write_path, file=file[0:-8], row_group = row_group, c_rank = c_rank), index = False)
 
 
 
@@ -722,7 +726,7 @@ def read_skill(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
         if num_read % 1000 == 0:
             print(num_read / numrows * 100, "percent read")
 
-    df.to_parquet(path_or_buf = "{write_path}/{file}_rowgroup{row_group}_{c_rank}.parquet".format(write_path = write_path, file=file[0:-8], row_group = row_group, c_rank = c_rank), index = False)
+    df.to_parquet(path = "{write_path}/{file}_rowgroup{row_group}_{c_rank}.parquet".format(write_path = write_path, file=file[0:-8], row_group = row_group, c_rank = c_rank), index = False)
 
 
 
