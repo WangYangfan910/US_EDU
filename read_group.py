@@ -298,7 +298,7 @@ def read_prof(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
     # find the common ids -- to reduce df size
     common_ids = set(ids["user_id"]).intersection(set(group_data["user_id"]))
     common_ids = list(common_ids)
-    numrows = len(common_ids)
+    # numrows = len(common_ids)
 
     # select only the subset with common user id
     group_data = group_data[group_data["user_id"].isin(common_ids)]
@@ -337,6 +337,7 @@ def read_prof(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
     data_ids = pd.unique(group_data["user_id"])
 
     num_read = 0
+    numrows = data_ids.shape[0]
     
     for eachid in data_ids:
 
@@ -395,7 +396,7 @@ def read_edu(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
     # find the common ids -- to reduce df size
     common_ids = set(ids["user_id"]).intersection(set(group_data["user_id"]))
     common_ids = list(common_ids)
-    numrows = len(common_ids)
+    # numrows = len(common_ids)
 
     # select only the subset with common user id
     group_data = group_data[group_data["user_id"].isin(common_ids)]
@@ -458,6 +459,7 @@ def read_edu(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
     data_ids = pd.unique(group_data["user_id"])
 
     num_read = 0
+    numrows = data_ids.shape[0]
 
     print("start iterating ids")
     # assumption: assume each id is associated with at most 10 rows
@@ -539,7 +541,7 @@ def read_pos(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
     # find the common ids -- to reduce df size
     common_ids = set(ids["user_id"]).intersection(set(group_data["user_id"]))
     common_ids = list(common_ids)
-    numrows = len(common_ids)
+    # numrows = len(common_ids)
 
 
     # select only the subset with common user id
@@ -588,6 +590,7 @@ def read_pos(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
     data_ids = pd.unique(group_data["user_id"])
 
     num_read = 0
+    numrows = data_ids.shape[0]
     
     for eachid in data_ids:
 
@@ -654,7 +657,7 @@ def read_skill(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
     # find the common ids -- to reduce df size
     common_ids = set(ids["user_id"]).intersection(set(group_data["user_id"]))
     common_ids = list(common_ids)
-    numrows = len(common_ids)
+    # numrows = len(common_ids)
 
 
     # select only the subset with common user id
@@ -691,6 +694,7 @@ def read_skill(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
     data_ids = pd.unique(group_data["user_id"])
 
     num_read = 0
+    numrows = data_ids.shape[0]
     
     for eachid in data_ids:
 

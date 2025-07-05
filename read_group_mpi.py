@@ -46,6 +46,9 @@ comm = MPI.COMM_WORLD
 num_process = comm.size # should be the same as the number of row groups in the current file
 rank = comm.Get_rank()
 
+if num_process != row_group_num * c_per_group:
+    raise(NameError("number of cores not match number of jobs"))
+
 
 ########################################################
 #################### Master Node #######################
