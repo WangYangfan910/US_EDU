@@ -285,11 +285,6 @@ def read_prof(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
     # construct file path
     file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
 
-    # obtain the min and max target id
-    # min_id = ids.column("user_id")[0].as_py()
-    # max_id = ids.column("user_id")[-1].as_py()
-    # numrows = ids.num_rows
-
     print("reading row group: ", row_group, "part", c_rank)
     
     # establish the data input stream
@@ -299,7 +294,6 @@ def read_prof(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
     # find the common ids -- to reduce df size
     common_ids = set(ids["user_id"]).intersection(set(group_data["user_id"]))
     common_ids = list(common_ids)
-    # numrows = len(common_ids)
 
     # select only the subset with common user id
     group_data = group_data[group_data["user_id"].isin(common_ids)]
@@ -317,12 +311,15 @@ def read_prof(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
 
     print("group data extracted")
     
+    # retrieve the id list of this row group, which is unique for user profile
+    data_ids = pd.unique(group_data["user_id"])
+    numrows = data_ids.shape[0]
 
     # create dataframes for storing data, 
     dt = {field_name: make_default_list(field_default, 1, numrows) for (field_name, field_default) in itertools.zip_longest(user_var, user_default)}
     # dt = {field_name: [field_default] * numrows for (field_name, field_default) in itertools.zip_longest(user_var, user_default)}
 
-    dt["user_id"] = common_ids
+    dt["user_id"] = data_ids
     df = pd.DataFrame(dt)
 
     # record col names except user_id and updated
@@ -333,12 +330,8 @@ def read_prof(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
     print("df created")
     
     access_row = 0
-
-    # retrieve the id list of this row group, which is unique for user profile
-    data_ids = pd.unique(group_data["user_id"])
-
     num_read = 0
-    numrows = data_ids.shape[0]
+    
     
     for eachid in data_ids:
 
@@ -397,7 +390,6 @@ def read_edu(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
     # find the common ids -- to reduce df size
     common_ids = set(ids["user_id"]).intersection(set(group_data["user_id"]))
     common_ids = list(common_ids)
-    # numrows = len(common_ids)
 
     # select only the subset with common user id
     group_data = group_data[group_data["user_id"].isin(common_ids)]
@@ -426,20 +418,16 @@ def read_edu(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
     thisleng = group_data.shape[0]
     group_data.index = range(0,thisleng)
 
-
     print("group data extracted")
 
-    dt = {field_name: make_default_list(field_default, 5, numrows) for (field_name, field_default) in itertools.zip_longest(edu_var, edu_default)}
-    # dt = {field_name: [arr.array("u", (field_default, field_default, field_default, field_default, field_default))] for (field_name, field_default) in itertools.zip_longest(edu_var, edu_default)}
+    # retrieve the id list of this data subset
+    data_ids = pd.unique(group_data["user_id"])
+    numrows = data_ids.shape[0]
 
-    dt["user_id"] = common_ids
-    # df1 = pd.DataFrame(dt)
-    # df2 = pd.DataFrame(dt)
-    # df3 = pd.DataFrame(dt)
-    # df4 = pd.DataFrame(dt)
-    # dfs = (df1, df2, df3, df4, df5)
+    dt = {field_name: make_default_list(field_default, 5, numrows) for (field_name, field_default) in itertools.zip_longest(edu_var, edu_default)}
+
+    dt["user_id"] = data_ids
     df = pd.DataFrame(dt)
-    # reset df row index
    
    
     # record col names except user_id and updated
@@ -448,19 +436,11 @@ def read_edu(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
     col_names.remove("updated")
 
     print("dfs created")
-    
-    
-    
-    # data_rows = group_data.shape[0]
-    
+        
     # use access_row to record the current scan row
     access_row = 0
     
-    # retrieve the id list of this data subset
-    data_ids = pd.unique(group_data["user_id"])
-
     num_read = 0
-    numrows = data_ids.shape[0]
 
     print("start iterating ids")
     # assumption: assume each id is associated with at most 10 rows
@@ -542,7 +522,6 @@ def read_pos(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
     # find the common ids -- to reduce df size
     common_ids = set(ids["user_id"]).intersection(set(group_data["user_id"]))
     common_ids = list(common_ids)
-    # numrows = len(common_ids)
 
 
     # select only the subset with common user id
@@ -564,13 +543,13 @@ def read_pos(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
 
     print("group data extracted")
 
+    # retrieve the id list of this data subset
+    data_ids = pd.unique(group_data["user_id"])
+    numrows = data_ids.shape[0]
+
+
     dt = {field_name: make_default_list(field_default, 4, numrows) for (field_name, field_default) in itertools.zip_longest(pos_var, pos_default)}
-    dt["user_id"] = common_ids
-    # df1 = pd.DataFrame(dt)
-    # df2 = pd.DataFrame(dt)
-    # df3 = pd.DataFrame(dt)
-    # df4 = pd.DataFrame(dt)
-    # dfs = (df1, df2, df3, df4)
+    dt["user_id"] = data_ids
 
     df = pd.DataFrame(dt)
 
@@ -581,17 +560,10 @@ def read_pos(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
 
     print("df created")
     
-
-    # data_rows = group_data.shape[0]
-
     # use access_row to record the current scan row
     access_row = 0
     
-    # retrieve the id list of this data subset
-    data_ids = pd.unique(group_data["user_id"])
-
     num_read = 0
-    numrows = data_ids.shape[0]
     
     for eachid in data_ids:
 
@@ -647,11 +619,6 @@ def read_skill(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
     # construct file path
     file_path = "{dir_path}/US_EDUC/{file}".format(dir_path=dir_path, file = file)
 
-    # obtain the min and max target id
-    # min_id = ids.column("user_id")[0].as_py()
-    # max_id = ids.column("user_id")[-1].as_py()
-    # numrows = ids.num_rows
-
     print("reading row group: ", row_group, "part", c_rank)
 
     # establish the data input stream
@@ -661,7 +628,6 @@ def read_skill(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
     # find the common ids -- to reduce df size
     common_ids = set(ids["user_id"]).intersection(set(group_data["user_id"]))
     common_ids = list(common_ids)
-    # numrows = len(common_ids)
 
 
     # select only the subset with common user id
@@ -681,9 +647,14 @@ def read_skill(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
 
     print("group data extracted")
 
+    # retrieve the id list of this row group, which is unique for user profile
+    data_ids = pd.unique(group_data["user_id"])
+    numrows = data_ids.shape[0]
+
+
     # create dataframes for storing data,
     dt = {field_name: make_default_list(field_default, 1, numrows) for (field_name, field_default) in itertools.zip_longest(skill_var, skill_default)}
-    dt["user_id"] = common_ids
+    dt["user_id"] = data_ids
     df = pd.DataFrame(dt)
 
     col_names = df.columns.to_list()
@@ -694,11 +665,7 @@ def read_skill(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
 
     access_row = 0
 
-    # retrieve the id list of this row group, which is unique for user profile
-    data_ids = pd.unique(group_data["user_id"])
-
     num_read = 0
-    numrows = data_ids.shape[0]
     
     for eachid in data_ids:
 
