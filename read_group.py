@@ -9,7 +9,6 @@ import pyarrow.compute as pc
 import pyarrow.parquet as pq
 import itertools
 import math
-from datetime import date
 from datetime import datetime
 
 
@@ -56,8 +55,8 @@ edu_default = (
                 "none", # "university_raw", 
                 "none", # "university_name", 
                 0, # "education_number", 
-                date(2077,9,10), # "startdate", 
-                date(2077,9,10), # "enddate", 
+                datetime(2077,9,10), # "startdate", 
+                datetime(2077,9,10), # "enddate", 
                 "none", # "degree", 
                 "none", # "field", 
                 "none", # "degree_raw", 
@@ -178,8 +177,8 @@ pos_default = (
                 "none", # "country",
                 "none", # "state",
                 "none", # "metro_area",
-                date(2077,9,10), # "startdate",
-                date(2077,9,10), # "enddate",
+                datetime(2077,9,10), # "startdate",
+                datetime(2077,9,10), # "enddate",
                 "none", # "title_raw",
                 "none", # "role_k1500",
                 "none", # "job_category",
@@ -595,7 +594,12 @@ def read_pos(ids, dir_path, write_path, file, row_group, c_per_group, c_rank):
                 
                 for col in col_names:
                     if (col == "startdate") | (col == "enddate"):
-                        df.at[id_index, col][ipos-access_row] = datetime.strptime(group_data.at[ipos, col], "%Y-%m-%d")
+                        if pd.isnull(group_data.at[ipos, col]):
+                            # the date value is null, record default 2077-09-10
+                            df.at[id_index, col][ipos-access_row] = datetime(2077, 9, 10)
+                        else:
+                            # date value is not null, record it
+                            df.at[id_index, col][ipos-access_row] = datetime.strptime(group_data.at[ipos, col], "%Y-%m-%d")
                     else:
                         df.at[id_index, col][ipos-access_row] = group_data.at[ipos, col]
                 
